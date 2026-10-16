@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sister.local/nexo/external-reference/1.0.0",
+  "title": "NEXO External Reference",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "provider_id", "external_id", "title", "canonical_uri", "observed_at"],
+  "properties": {
+    "schema": {"const": "nexo.external-reference/1.0.0"},
+    "provider_id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$"},
+    "external_id": {"type": "string", "minLength": 1, "maxLength": 500},
+    "title": {"type": "string", "minLength": 1, "maxLength": 1000},
+    "canonical_uri": {"type": "string", "format": "uri", "maxLength": 4000},
+    "version": {"type": "string", "maxLength": 500},
+    "content_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "media_type": {"type": "string", "maxLength": 200},
+    "access_class": {"enum": ["public", "restricted", "embargoed", "unknown"]}
+  }
+}

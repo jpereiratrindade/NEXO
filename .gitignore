@@ -1,0 +1,6 @@
+/build/
+/.env
+/.run/
+*.log
+uploads/
+postgres-data/

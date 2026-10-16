@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://sister.local/nexo/connector-capabilities/1.0.0",
+  "title": "NEXO Connector Capabilities",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "connector_id", "provider_id", "operations"],
+  "properties": {
+    "schema": {"const": "nexo.connector-capabilities/1.0.0"},
+    "connector_id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$"},
+    "provider_id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{1,63}$"},
+    "operations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["discover", "describe", "retrieve", "submit", "submission_status"]}
+    },
+    "authentication": {"enum": ["none", "service", "delegated_user"]},
+    "transports": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {"enum": ["http", "csw", "wfs", "wcs", "dataverse"]}
+    }
+  }
+}
