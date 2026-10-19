@@ -96,11 +96,6 @@ std::string environment(const char* name) {
     return value == nullptr ? std::string{} : std::string(value);
 }
 
-nexo::auth::MailConfig mail_config() {
-    return {environment("NEXO_SMTP_URL"), environment("NEXO_SMTP_FROM"),
-            environment("NEXO_SMTP_USERNAME"), environment("NEXO_SMTP_PASSWORD")};
-}
-
 std::string load_asset(const std::string_view filename) {
     const auto path = std::filesystem::path(NEXO_WEB_ROOT) / filename;
     std::ifstream stream(path, std::ios::binary);
@@ -131,19 +126,22 @@ Response response_for(const std::string_view request) {
             if (!nexo::auth::is_embrapa_email(email))
                 return {422, "Unprocessable Entity", "application/json",
                         R"({"error":{"code":"invalid_email","message":"Use um e-mail @embrapa.br válido"}})", {}};
+            if (environment("NEXO_AUTH_MODE") != "development")
+                return {503, "Service Unavailable", "application/json",
+                        R"({"error":{"code":"identity_provider_unavailable","message":"Provedor institucional de identidade não configurado"}})", {}};
             const auto result = nexo::auth::request_code(connection, email,
-                                                          environment("NEXO_AUTH_PEPPER"),
-                                                          mail_config());
-            if (!result.sent)
+                                                          environment("NEXO_AUTH_PEPPER"));
+            if (result.challenge_id.empty())
                 return {429, "Too Many Requests", "application/json",
                         R"({"error":{"code":"rate_limited","message":"Aguarde antes de solicitar outro código"}})",
                         "Retry-After: 60\r\n"};
             return {202, "Accepted", "application/json",
                     "{\"challenge_id\":\"" + result.challenge_id +
-                        "\",\"expires_in\":600}", {}};
+                        "\",\"expires_in\":600,\"development_code\":\"" +
+                        result.development_code + "\",\"delivery\":\"local_development\"}", {}};
         } catch (const std::exception&) {
             return {503, "Service Unavailable", "application/json",
-                    R"({"error":{"code":"delivery_unavailable","message":"Não foi possível enviar o código"}})", {}};
+                    R"({"error":{"code":"auth_unavailable","message":"Autenticação indisponível"}})", {}};
         }
     }
     if (request.starts_with("POST /api/v1/auth/verify-code ")) {

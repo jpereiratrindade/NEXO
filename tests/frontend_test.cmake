@@ -16,6 +16,7 @@ foreach(marker IN ITEMS
     "E-mail Embrapa"
     "id=\"email-form\""
     "id=\"code-form\""
+    "id=\"development-code\""
     "id=\"health-value\""
     "id=\"capability-list\"")
   string(FIND "${html}" "${marker}" found)

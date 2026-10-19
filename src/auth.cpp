@@ -1,6 +1,5 @@
 #include "nexo/auth.hpp"
 
-#include <curl/curl.h>
 #include <libpq-fe.h>
 #include <openssl/crypto.h>
 #include <openssl/rand.h>
@@ -45,56 +44,6 @@ std::string hex(const unsigned char* data, const std::size_t size) {
         value[index * 2 + 1] = digits[data[index] & 15U];
     }
     return value;
-}
-
-struct Upload {
-    std::string_view payload;
-    std::size_t offset{};
-};
-
-std::size_t read_mail(char* destination, const std::size_t size, const std::size_t count,
-                      void* context) {
-    auto& upload = *static_cast<Upload*>(context);
-    const auto capacity = size * count;
-    const auto remaining = upload.payload.size() - upload.offset;
-    const auto bytes = std::min(capacity, remaining);
-    std::copy_n(upload.payload.data() + upload.offset, bytes, destination);
-    upload.offset += bytes;
-    return bytes;
-}
-
-void send_code(const MailConfig& config, const std::string_view recipient,
-               const std::string_view code) {
-    if (config.url.empty() || config.from.empty())
-        throw std::runtime_error("SMTP não configurado");
-    static const int curl_ready = curl_global_init(CURL_GLOBAL_DEFAULT);
-    if (curl_ready != CURLE_OK) throw std::runtime_error("cliente SMTP indisponível");
-    const std::string payload = "From: NEXO <" + config.from + ">\r\nTo: <" +
-        std::string(recipient) +
-        ">\r\nSubject: Seu código de acesso ao NEXO\r\nMIME-Version: 1.0\r\n"
-        "Content-Type: text/plain; charset=UTF-8\r\n\r\n"
-        "Seu código de acesso ao NEXO é: " + std::string(code) +
-        "\r\n\r\nEle expira em 10 minutos e pode ser usado uma única vez.\r\n"
-        "Se você não solicitou este acesso, ignore esta mensagem.\r\n";
-    Upload upload{payload};
-    std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), &curl_easy_cleanup);
-    if (!curl) throw std::runtime_error("cliente SMTP indisponível");
-    curl_slist* raw_recipients = nullptr;
-    raw_recipients = curl_slist_append(raw_recipients, std::string(recipient).c_str());
-    std::unique_ptr<curl_slist, decltype(&curl_slist_free_all)> recipients(raw_recipients,
-                                                                           &curl_slist_free_all);
-    curl_easy_setopt(curl.get(), CURLOPT_URL, config.url.c_str());
-    curl_easy_setopt(curl.get(), CURLOPT_MAIL_FROM, config.from.c_str());
-    curl_easy_setopt(curl.get(), CURLOPT_MAIL_RCPT, recipients.get());
-    curl_easy_setopt(curl.get(), CURLOPT_USE_SSL, CURLUSESSL_ALL);
-    curl_easy_setopt(curl.get(), CURLOPT_UPLOAD, 1L);
-    curl_easy_setopt(curl.get(), CURLOPT_READFUNCTION, read_mail);
-    curl_easy_setopt(curl.get(), CURLOPT_READDATA, &upload);
-    curl_easy_setopt(curl.get(), CURLOPT_INFILESIZE_LARGE, static_cast<curl_off_t>(payload.size()));
-    curl_easy_setopt(curl.get(), CURLOPT_TIMEOUT, 15L);
-    if (!config.username.empty()) curl_easy_setopt(curl.get(), CURLOPT_USERNAME, config.username.c_str());
-    if (!config.password.empty()) curl_easy_setopt(curl.get(), CURLOPT_PASSWORD, config.password.c_str());
-    if (curl_easy_perform(curl.get()) != CURLE_OK) throw std::runtime_error("falha ao enviar e-mail");
 }
 
 }  // namespace
@@ -148,25 +97,19 @@ void setup_admin(const std::string_view connection, const std::string_view email
 }
 
 CodeRequest request_code(const std::string_view connection, const std::string_view email,
-                         const std::string_view pepper, const MailConfig& mail) {
+                         const std::string_view pepper) {
     if (!is_embrapa_email(email)) throw std::invalid_argument("e-mail Embrapa inválido");
     if (pepper.size() < 32) throw std::runtime_error("NEXO_AUTH_PEPPER inválido");
     auto db = connect(connection);
     auto rate = query(db.get(), "SELECT count(*)::int,COALESCE(EXTRACT(EPOCH FROM now()-max(created_at))::int,9999) FROM nexo_login_codes WHERE email=$1 AND created_at>now()-interval '1 hour'",
                       {std::string(email)});
     if (std::stoi(PQgetvalue(rate.get(), 0, 0)) >= 5 || std::stoi(PQgetvalue(rate.get(), 0, 1)) < 60)
-        return {{}, false};
+        return {{}, {}};
     const auto challenge = random_hex(16);
     const auto code = one_time_code();
     query(db.get(), "INSERT INTO nexo_login_codes(challenge_id,email,code_hash,expires_at) VALUES($1,$2,$3,now()+interval '10 minutes')",
           {challenge, std::string(email), code_digest(challenge, code, pepper)});
-    try {
-        send_code(mail, email, code);
-    } catch (...) {
-        query(db.get(), "DELETE FROM nexo_login_codes WHERE challenge_id=$1", {challenge});
-        throw;
-    }
-    return {challenge, true};
+    return {challenge, code};
 }
 
 std::optional<LoginResult> verify_code(const std::string_view connection,

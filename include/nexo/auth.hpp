@@ -20,16 +20,9 @@ struct LoginResult {
     std::string csrf_token;
 };
 
-struct MailConfig {
-    std::string url;
-    std::string from;
-    std::string username;
-    std::string password;
-};
-
 struct CodeRequest {
     std::string challenge_id;
-    bool sent;
+    std::string development_code;
 };
 
 [[nodiscard]] std::string sha256(std::string_view value);
@@ -42,7 +35,7 @@ struct CodeRequest {
 void setup_admin(std::string_view connection, std::string_view email,
                  std::string_view display_name);
 [[nodiscard]] CodeRequest request_code(std::string_view connection, std::string_view email,
-                                       std::string_view pepper, const MailConfig& mail);
+                                       std::string_view pepper);
 [[nodiscard]] std::optional<LoginResult> verify_code(std::string_view connection,
                                                       std::string_view challenge_id,
                                                       std::string_view code,

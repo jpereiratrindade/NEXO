@@ -20,6 +20,7 @@ function unlock() {
 
 function showEmailStep() {
   challenge = '';
+  $('#development-code').textContent = '';
   $('#code-form').reset();
   $('#code-form').hidden = true;
   $('#email-form').hidden = false;
@@ -45,7 +46,8 @@ $('#email-form').addEventListener('submit', async (event) => {
       method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget)))
     });
     challenge = result.challenge_id;
-    $('#code-destination').textContent = `Código enviado para ${pendingEmail}. Válido por 10 minutos.`;
+    $('#code-destination').textContent = `Identidade local associada a ${pendingEmail}. Código válido por 10 minutos.`;
+    $('#development-code').textContent = result.development_code;
     $('#email-form').hidden = true;
     $('#code-form').hidden = false;
     $('#code-form input[name="code"]').focus();

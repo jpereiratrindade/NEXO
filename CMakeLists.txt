@@ -3,7 +3,6 @@ project(nexo VERSION 0.1.0 LANGUAGES CXX)
 
 find_package(OpenSSL REQUIRED)
 find_package(PostgreSQL REQUIRED)
-find_package(CURL REQUIRED)
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -15,7 +14,7 @@ target_compile_options(nexo_domain PRIVATE -Wall -Wextra -Wpedantic -Wconversion
 
 add_library(nexo_auth src/auth.cpp)
 target_include_directories(nexo_auth PUBLIC include)
-target_link_libraries(nexo_auth PRIVATE OpenSSL::Crypto PostgreSQL::PostgreSQL CURL::libcurl)
+target_link_libraries(nexo_auth PRIVATE OpenSSL::Crypto PostgreSQL::PostgreSQL)
 target_compile_options(nexo_auth PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 add_executable(nexo-server src/main.cpp)
