@@ -10,7 +10,10 @@ int main() {
         !nexo::auth::password_matches(password, hash) ||
         nexo::auth::password_matches("senha-errada-2026", hash) ||
         nexo::auth::sha256("token").size() != 64 ||
-        nexo::auth::random_hex().size() != 64) {
+        nexo::auth::random_hex().size() != 64 ||
+        !nexo::auth::is_embrapa_email("pesquisador@embrapa.br") ||
+        nexo::auth::is_embrapa_email("pesquisador@gmail.com") ||
+        nexo::auth::is_embrapa_email("PESQUISADOR@embrapa.br")) {
         std::cerr << "FAIL: invariantes criptográficas de autenticação\n";
         return EXIT_FAILURE;
     }

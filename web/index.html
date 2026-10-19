@@ -26,9 +26,9 @@
     <section class="login-card">
       <span class="login-kicker">Acesso ao sistema</span>
       <h2>Boas-vindas</h2>
-      <p>Entre para acessar o ambiente PROBANTE.</p>
+      <p>Use sua identidade institucional para acessar o NEXO.</p>
       <form id="login-form">
-        <label>Usuário<input name="login" autocomplete="username" required></label>
+        <label>E-mail Embrapa<input name="email" type="email" inputmode="email" autocomplete="username" placeholder="nome@embrapa.br" pattern=".+@embrapa\.br" required></label>
         <label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
         <button type="submit">Entrar</button>
         <p class="login-error" role="alert"></p>
@@ -50,7 +50,7 @@
       <a href="#fronteira">Fronteira</a>
       <a href="#contratos">Contratos</a>
     </nav>
-    <div class="top-context"><span class="context-pill">PROBANTE · testes</span><button class="logout" id="logout" type="button">Sair</button><div class="live-pill"><span class="pulse" aria-hidden="true"></span><span id="nav-status">verificando</span></div></div>
+    <div class="top-context"><span class="context-pill">NEXO · científico</span><button class="logout" id="logout" type="button">Sair</button><div class="live-pill"><span class="pulse" aria-hidden="true"></span><span id="nav-status">verificando</span></div></div>
   </header>
 
   <main id="conteudo">

@@ -25,7 +25,7 @@ Este projeto é um MVP isolado. Não substitui `sister-nexo`.
 - servidor HTTP mínimo em `127.0.0.1`;
 - endpoints `/api/health`, `/api/readiness` e `/api/capabilities`;
 - interface web responsiva servida na raiz `/`;
-- autenticação PostgreSQL com PBKDF2, sessão opaca, CSRF e cookie HttpOnly;
+- autenticação por e-mail `@embrapa.br` com PBKDF2, sessão opaca, CSRF e cookie HttpOnly;
 - testes do domínio e dos contratos.
 
 ## Build
@@ -53,7 +53,7 @@ Defina `NEXO_DATABASE_URL`, aplique as migrações e crie o primeiro administrad
 export NEXO_DATABASE_URL='postgresql://...'
 psql "$NEXO_DATABASE_URL" -f storage/migrations/001_initial.sql
 psql "$NEXO_DATABASE_URL" -f storage/migrations/002_authentication.sql
-./build/nexo-server setup-admin --login admin --display-name "Administrador"
+./build/nexo-server setup-admin --email nome@embrapa.br --display-name "Administrador"
 ```
 
 A senha é solicitada no terminal e nunca aceita por argumento.

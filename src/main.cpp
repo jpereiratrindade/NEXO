@@ -5,9 +5,11 @@
 
 #include "nexo/auth.hpp"
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <chrono>
+#include <cctype>
 #include <cstdlib>
 #include <filesystem>
 #include <fstream>
@@ -112,16 +114,19 @@ Response response_for(const std::string_view request) {
             if (connection.empty())
                 return {503, "Service Unavailable", "application/json",
                         R"({"error":{"code":"database_not_configured","message":"NEXO_DATABASE_URL ausente"}})", {}};
-            const auto login_name = json_field(body_of(request), "login");
+            auto email = json_field(body_of(request), "email");
+            std::transform(email.begin(), email.end(), email.begin(), [](const unsigned char character) {
+                return static_cast<char>(std::tolower(character));
+            });
             const auto password = json_field(body_of(request), "password");
-            const auto result = nexo::auth::login(connection, login_name, password);
+            const auto result = nexo::auth::login(connection, email, password);
             if (!result) {
                 std::this_thread::sleep_for(std::chrono::milliseconds(150));
                 return {401, "Unauthorized", "application/json",
                         R"({"error":{"code":"invalid_credentials","message":"Credenciais inválidas"}})", {}};
             }
             const auto body = "{\"user\":{\"id\":\"" + json_escape(result->user.id) +
-                "\",\"login\":\"" + json_escape(result->user.login) +
+                "\",\"email\":\"" + json_escape(result->user.email) +
                 "\",\"display_name\":\"" + json_escape(result->user.display_name) +
                 "\",\"role\":\"" + json_escape(result->user.role) +
                 "\"},\"csrf_token\":\"" + result->csrf_token + "\"}";
@@ -139,8 +144,8 @@ Response response_for(const std::string_view request) {
             if (!user) return {401, "Unauthorized", "application/json",
                                R"({"error":{"code":"unauthenticated","message":"Autenticação necessária"}})", {}};
             return {200, "OK", "application/json",
-                    "{\"user\":{\"id\":\"" + json_escape(user->id) + "\",\"login\":\"" +
-                        json_escape(user->login) + "\",\"display_name\":\"" +
+                    "{\"user\":{\"id\":\"" + json_escape(user->id) + "\",\"email\":\"" +
+                        json_escape(user->email) + "\",\"display_name\":\"" +
                         json_escape(user->display_name) + "\",\"role\":\"" +
                         json_escape(user->role) + "\"}}", {}};
         } catch (const std::exception&) {
@@ -205,16 +210,17 @@ int main(const int argc, char** argv) {
             std::cerr << "NEXO_DATABASE_URL ausente\n";
             return EXIT_FAILURE;
         }
-        std::string login_name = "admin";
+        std::string email;
         std::string display_name = "Administrador";
         for (int index = 2; index + 1 < argc; index += 2) {
-            if (std::string_view(argv[index]) == "--login") login_name = argv[index + 1];
+            if (std::string_view(argv[index]) == "--email") email = argv[index + 1];
             else if (std::string_view(argv[index]) == "--display-name") display_name = argv[index + 1];
-            else { std::cerr << "uso: nexo-server setup-admin [--login nome] [--display-name nome]\n"; return EXIT_FAILURE; }
+            else { std::cerr << "uso: nexo-server setup-admin --email usuario@embrapa.br [--display-name nome]\n"; return EXIT_FAILURE; }
         }
+        if (email.empty()) { std::cerr << "--email é obrigatório\n"; return EXIT_FAILURE; }
         const char* raw = ::getpass("Senha (mínimo 12 caracteres): ");
         try {
-            nexo::auth::setup_admin(connection, login_name, display_name, raw == nullptr ? "" : raw);
+            nexo::auth::setup_admin(connection, email, display_name, raw == nullptr ? "" : raw);
             std::cout << "Administrador criado.\n";
             return EXIT_SUCCESS;
         } catch (const std::exception& error) {

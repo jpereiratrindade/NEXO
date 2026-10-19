@@ -7,6 +7,7 @@
 #include <openssl/sha.h>
 
 #include <charconv>
+#include <cctype>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -72,6 +73,16 @@ std::string password_hash(const std::string_view password) {
     return "pbkdf2-sha256$310000$" + salt + "$" + hex(output, sizeof output);
 }
 
+bool is_embrapa_email(const std::string_view email) {
+    constexpr std::string_view domain = "@embrapa.br";
+    if (email.size() <= domain.size() || !email.ends_with(domain)) return false;
+    if (email.front() == '.' || email[email.size() - domain.size() - 1] == '.') return false;
+    for (const unsigned char character : email) {
+        if (std::isupper(character) != 0 || std::isspace(character) != 0) return false;
+    }
+    return email.find('@') == email.size() - domain.size();
+}
+
 bool password_matches(const std::string_view password, const std::string_view encoded) {
     const auto first = encoded.find('$');
     const auto second = encoded.find('$', first + 1);
@@ -94,22 +105,24 @@ bool password_matches(const std::string_view password, const std::string_view en
     return CRYPTO_memcmp(expected.data(), actual.data(), actual.size()) == 0;
 }
 
-void setup_admin(const std::string_view connection, const std::string_view login_name,
+void setup_admin(const std::string_view connection, const std::string_view email,
                  const std::string_view display_name, const std::string_view password) {
+    if (!is_embrapa_email(email)) throw std::invalid_argument("e-mail deve pertencer ao domínio @embrapa.br");
     auto db = connect(connection);
     auto count = query(db.get(), "SELECT count(*) FROM nexo_users WHERE role='admin' AND active");
     if (std::string_view(PQgetvalue(count.get(), 0, 0)) != "0")
         throw std::runtime_error("administrador ativo já existe");
-    query(db.get(), "INSERT INTO nexo_users(login,display_name,password_hash,role) VALUES($1,$2,$3,'admin')",
-          {std::string(login_name), std::string(display_name), password_hash(password)});
+    query(db.get(), "INSERT INTO nexo_users(email,display_name,password_hash,role) VALUES($1,$2,$3,'admin')",
+          {std::string(email), std::string(display_name), password_hash(password)});
 }
 
 std::optional<LoginResult> login(const std::string_view connection,
-                                 const std::string_view login_name,
+                                 const std::string_view email,
                                  const std::string_view password) {
+    if (!is_embrapa_email(email)) return std::nullopt;
     auto db = connect(connection);
-    auto user = query(db.get(), "SELECT user_id::text,login,display_name,password_hash,role FROM nexo_users WHERE login=$1 AND active",
-                      {std::string(login_name)});
+    auto user = query(db.get(), "SELECT user_id::text,email,display_name,password_hash,role FROM nexo_users WHERE email=$1 AND active",
+                      {std::string(email)});
     if (PQntuples(user.get()) != 1 || !password_matches(password, PQgetvalue(user.get(), 0, 3)))
         return std::nullopt;
     const auto token = random_hex();
@@ -125,7 +138,7 @@ std::optional<User> authenticate(const std::string_view connection,
                                  const std::string_view session_token) {
     if (session_token.empty()) return std::nullopt;
     auto db = connect(connection);
-    auto result = query(db.get(), "SELECT u.user_id::text,u.login,u.display_name,u.role,s.csrf_hash FROM nexo_sessions s JOIN nexo_users u ON u.user_id=s.user_id WHERE s.secret_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now() AND u.active",
+    auto result = query(db.get(), "SELECT u.user_id::text,u.email,u.display_name,u.role,s.csrf_hash FROM nexo_sessions s JOIN nexo_users u ON u.user_id=s.user_id WHERE s.secret_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now() AND u.active",
                         {sha256(session_token)});
     if (PQntuples(result.get()) != 1) return std::nullopt;
     return User{PQgetvalue(result.get(), 0, 0), PQgetvalue(result.get(), 0, 1),
