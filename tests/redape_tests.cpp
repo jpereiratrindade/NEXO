@@ -27,10 +27,17 @@ int main() {
         .author = "Pereira",
         .subject = "Agricultural Sciences",
         .state = "Bahia",
+        .match = "all",
     };
     const auto query = nexo::redape::build_query(criteria);
-    if (query != "\"produção agroecológica\" AND title:\"solo\" AND authorName:\"Pereira\" AND subject:\"Agricultural Sciences\" AND state:\"Bahia\"") {
+    if (query != "(produção agroecológica) AND title:\"solo\" AND authorName:\"Pereira\" AND subject:\"Agricultural Sciences\" AND state:\"Bahia\"") {
         std::cerr << "FAIL: tradução dos critérios avançados\n";
+        return EXIT_FAILURE;
+    }
+    auto any = criteria;
+    any.match = "any";
+    if (nexo::redape::build_query(any).find(" OR ") == std::string::npos) {
+        std::cerr << "FAIL: combinação inclusiva dos critérios\n";
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

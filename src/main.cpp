@@ -246,13 +246,18 @@ Response response_for(const std::string_view request) {
                 .keyword = json_field(body_of(request), "keyword"),
                 .subject = json_field(body_of(request), "subject"),
                 .state = json_field(body_of(request), "state"),
+                .match = json_field(body_of(request), "match"),
             };
+            if (criteria.match.empty()) criteria.match = "any";
             if (criteria.general.size() > 200 || criteria.title.size() > 200 ||
                 criteria.author.size() > 200 || criteria.description.size() > 200 ||
                 criteria.keyword.size() > 200 || criteria.subject.size() > 100 ||
                 criteria.state.size() > 100)
                 return {422, "Unprocessable Entity", "application/json",
                         R"({"error":{"code":"invalid_query","message":"Critério de pesquisa excede o limite"}})", {}};
+            if (criteria.match != "any" && criteria.match != "all")
+                return {422, "Unprocessable Entity", "application/json",
+                        R"({"error":{"code":"invalid_match","message":"Combinação de critérios inválida"}})", {}};
             const auto requested_limit = json_field(body_of(request), "limit");
             if (!requested_limit.empty()) {
                 const auto parsed = std::from_chars(requested_limit.data(),

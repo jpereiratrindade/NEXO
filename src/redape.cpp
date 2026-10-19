@@ -71,6 +71,16 @@ std::string solr_phrase(const std::string_view value) {
     return escaped_value;
 }
 
+std::string solr_terms(const std::string_view value) {
+    constexpr std::string_view reserved = "+-!(){}[]^\"~*?:\\/";
+    std::string escaped_value;
+    for (const char character : value) {
+        if (reserved.find(character) != std::string_view::npos) escaped_value.push_back('\\');
+        escaped_value.push_back(character);
+    }
+    return "(" + escaped_value + ")";
+}
+
 }  // namespace
 
 Discovery parse_search_response(const std::string_view response) {
@@ -110,7 +120,7 @@ std::string build_query(const SearchCriteria& criteria) {
     const auto add = [&clauses](const std::string_view field, const std::string& value) {
         if (!value.empty()) clauses.push_back(std::string(field) + ":" + solr_phrase(value));
     };
-    if (!criteria.general.empty()) clauses.push_back(solr_phrase(criteria.general));
+    if (!criteria.general.empty()) clauses.push_back(solr_terms(criteria.general));
     add("title", criteria.title);
     add("authorName", criteria.author);
     add("dsDescriptionValue", criteria.description);
@@ -119,8 +129,9 @@ std::string build_query(const SearchCriteria& criteria) {
     add("state", criteria.state);
     if (clauses.empty()) return "*";
     std::string query_text = clauses.front();
+    const auto joiner = criteria.match == "all" ? " AND " : " OR ";
     for (std::size_t index = 1; index < clauses.size(); ++index)
-        query_text += " AND " + clauses[index];
+        query_text += joiner + clauses[index];
     return query_text;
 }
 
@@ -165,7 +176,8 @@ IngestReceipt ingest(const std::string_view connection, const SearchCriteria& cr
             const nlohmann::json scope{{"query", criteria.general}, {"title", criteria.title},
                                        {"author", criteria.author}, {"description", criteria.description},
                                        {"keyword", criteria.keyword}, {"subject", criteria.subject},
-                                       {"state", criteria.state}, {"limit", criteria.limit}};
+                                       {"state", criteria.state}, {"match", criteria.match},
+                                       {"limit", criteria.limit}};
             const nlohmann::json receipt{{"source", std::string(search_endpoint)},
                                          {"total_available", discovery.total_available}};
             query(db.get(),
