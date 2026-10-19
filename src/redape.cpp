@@ -190,7 +190,8 @@ IngestReceipt ingest(const std::string_view connection, const SearchCriteria& cr
         query(db.get(), "ROLLBACK");
         throw;
     }
-    return {discovery.references.size(), cataloged, discovery.total_available};
+    return {discovery.references.size(), cataloged, discovery.total_available,
+            std::move(discovery.references)};
 }
 
 }  // namespace nexo::redape

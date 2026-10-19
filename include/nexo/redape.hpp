@@ -30,6 +30,7 @@ struct IngestReceipt {
     std::size_t discovered{};
     std::size_t cataloged{};
     std::size_t total_available{};
+    std::vector<ExternalReference> references;
 };
 
 [[nodiscard]] Discovery parse_search_response(std::string_view response);

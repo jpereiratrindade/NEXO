@@ -122,8 +122,22 @@ $('#redape-ingest-form').addEventListener('submit', async (event) => {
       method: 'POST', body: JSON.stringify(payload)
     });
     output.textContent = `${result.cataloged} referência(s) catalogada(s); ${result.total_available} disponível(is) no resultado remoto.`;
+    const references = Array.isArray(result.items) ? result.items : [];
+    $('#redape-results').replaceChildren(...references.map((reference) => {
+      const item = document.createElement('li');
+      const link = document.createElement('a');
+      link.href = reference.canonical_uri;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = reference.title;
+      const metadata = document.createElement('span');
+      metadata.textContent = `${reference.external_id}${reference.version ? ` · versão ${reference.version}` : ''}`;
+      item.append(link, metadata);
+      return item;
+    }));
   } catch (failure) {
     output.textContent = failure.message;
+    $('#redape-results').replaceChildren();
   } finally {
     button.disabled = false;
   }

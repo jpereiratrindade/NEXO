@@ -268,11 +268,21 @@ Response response_for(const std::string_view request) {
                             R"({"error":{"code":"invalid_limit","message":"Limite deve estar entre 1 e 100"}})", {}};
             }
             const auto receipt = nexo::redape::ingest(database_url(), criteria);
+            std::string items = "[";
+            for (std::size_t index = 0; index < receipt.references.size(); ++index) {
+                const auto& reference = receipt.references[index];
+                if (index != 0) items += ',';
+                items += "{\"external_id\":\"" + json_escape(reference.external_id) +
+                    "\",\"title\":\"" + json_escape(reference.title) +
+                    "\",\"canonical_uri\":\"" + json_escape(reference.canonical_uri) +
+                    "\",\"version\":\"" + json_escape(reference.version.value_or("")) + "\"}";
+            }
+            items += ']';
             return {200, "OK", "application/json",
                     "{\"provider_id\":\"redape\",\"discovered\":" +
                         std::to_string(receipt.discovered) + ",\"cataloged\":" +
                         std::to_string(receipt.cataloged) + ",\"total_available\":" +
-                        std::to_string(receipt.total_available) + "}", {}};
+                        std::to_string(receipt.total_available) + ",\"items\":" + items + "}", {}};
         } catch (const std::exception& error) {
             std::cerr << "[NEXO REDAPE] " << error.what() << '\n';
             return {502, "Bad Gateway", "application/json",

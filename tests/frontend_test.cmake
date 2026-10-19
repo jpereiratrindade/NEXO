@@ -20,6 +20,7 @@ foreach(marker IN ITEMS
     "id=\"health-value\""
     "id=\"capability-list\""
     "id=\"redape-ingest-form\""
+    "id=\"redape-results\""
     "Pesquisa avançada"
     "https://www.redape.dados.embrapa.br/dataverse/redape/search")
   string(FIND "${html}" "${marker}" found)
