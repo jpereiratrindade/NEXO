@@ -3,6 +3,8 @@ project(nexo VERSION 0.1.0 LANGUAGES CXX)
 
 find_package(OpenSSL REQUIRED)
 find_package(PostgreSQL REQUIRED)
+find_package(CURL REQUIRED)
+find_package(nlohmann_json REQUIRED)
 
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,8 +19,13 @@ target_include_directories(nexo_auth PUBLIC include)
 target_link_libraries(nexo_auth PRIVATE OpenSSL::Crypto PostgreSQL::PostgreSQL)
 target_compile_options(nexo_auth PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
+add_library(nexo_redape src/redape.cpp)
+target_include_directories(nexo_redape PUBLIC include)
+target_link_libraries(nexo_redape PRIVATE nexo_domain CURL::libcurl PostgreSQL::PostgreSQL nlohmann_json::nlohmann_json)
+target_compile_options(nexo_redape PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+
 add_executable(nexo-server src/main.cpp)
-target_link_libraries(nexo-server PRIVATE nexo_auth)
+target_link_libraries(nexo-server PRIVATE nexo_auth nexo_redape)
 target_compile_options(nexo-server PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 target_compile_definitions(nexo-server PRIVATE NEXO_WEB_ROOT="${CMAKE_CURRENT_BINARY_DIR}/web")
 
@@ -37,6 +44,10 @@ if(BUILD_TESTING)
   add_executable(nexo_auth_tests tests/auth_tests.cpp)
   target_link_libraries(nexo_auth_tests PRIVATE nexo_auth)
   add_test(NAME probante_auth COMMAND nexo_auth_tests)
+
+  add_executable(nexo_redape_tests tests/redape_tests.cpp)
+  target_link_libraries(nexo_redape_tests PRIVATE nexo_redape)
+  add_test(NAME probante_redape COMMAND nexo_redape_tests)
 
   add_test(
     NAME probante_contracts

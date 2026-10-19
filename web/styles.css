@@ -85,6 +85,10 @@ dl div { display: grid; gap: .3rem; } dt { color: #77867f; font-size: .65rem; te
 .readiness-value { margin-top: auto; font: 700 clamp(4rem, 7vw, 7rem)/.8 var(--serif); color: #42bfb0; }
 .meter { height: 3px; background: rgba(255,255,255,.15); margin-top: .7rem; }.meter span { display: block; width: 0; height: 100%; background: #42bfb0; transition: width .8s ease; }
 
+.redape { display: grid; grid-template-columns: 1.2fr 1fr; gap: clamp(3rem,8vw,8rem); padding: clamp(5rem,9vw,8rem) clamp(1.2rem,4vw,4.5rem); background: white; }
+.redape h2 { margin: 1rem 0 1.5rem; font: 500 clamp(2.8rem,5vw,5rem)/.95 var(--serif); letter-spacing: -.045em; }.redape-copy p { max-width: 650px; color: var(--muted); line-height: 1.65; }
+.ingest-form { align-self: center; padding: 2rem; border: 1px solid var(--line); background: var(--paper); }.ingest-form label { display: grid; gap: .5rem; margin-bottom: 1rem; font-size: .75rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; }.ingest-form input, .ingest-form select { width: 100%; padding: .9rem; border: 1px solid #b8c5cf; background: white; color: var(--ink); font: inherit; }.ingest-form button { width: 100%; padding: 1rem; border: 0; background: var(--acid); color: white; font-weight: 850; cursor: pointer; }.ingest-form button:disabled { opacity: .55; cursor: wait; }.ingest-form p { min-height: 2.5em; margin: 1rem 0 0; color: var(--muted); font-size: .78rem; line-height: 1.5; }
+
 .boundary { padding: clamp(5rem, 10vw, 9rem) clamp(1.2rem, 4vw, 4.5rem); }
 .boundary-intro { width: min(760px, 100%); }
 .boundary-intro > p { margin: 2rem 0 0; width: min(580px, 100%); color: var(--muted); font-size: 1.1rem; line-height: 1.6; }
@@ -110,6 +114,7 @@ footer p { font: 1.35rem var(--serif); } footer p em { color: var(--blue); } foo
   .hero-lower { margin-left: 0; width: 100%; display: block; }.cta { margin-top: 2rem; }.orbit { display: none; }
   .section-heading { align-items: start; gap: 2rem; }.section-heading time { margin-top: .5rem; }
   .telemetry { grid-template-columns: 1fr; }.telemetry article { border-right: 0; border-bottom: 1px solid rgba(255,255,255,.2); }
+  .redape { grid-template-columns: 1fr; }
   .flow { grid-template-columns: 1fr; gap: 1rem; }.flow-line { transform: rotate(90deg); justify-self: start; }.flow h3 { margin-top: 1.5rem; }
   .section-heading.light { display: block; }.section-heading.light > p { margin-top: 1.5rem; }
   .contract-grid { grid-template-columns: 1fr; }.contract-grid article + article { border-left: 0; border-top: 1px solid rgba(255,255,255,.35); }

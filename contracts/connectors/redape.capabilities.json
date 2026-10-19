@@ -1,0 +1,8 @@
+{
+  "schema": "nexo.connector-capabilities/1.0.0",
+  "connector_id": "redape_dataverse",
+  "provider_id": "redape",
+  "operations": ["discover", "describe", "retrieve"],
+  "authentication": "none",
+  "transports": ["http", "dataverse"]
+}

@@ -18,7 +18,8 @@ foreach(marker IN ITEMS
     "id=\"code-form\""
     "id=\"development-code\""
     "id=\"health-value\""
-    "id=\"capability-list\"")
+    "id=\"capability-list\""
+    "id=\"redape-ingest-form\"")
   string(FIND "${html}" "${marker}" found)
   if(found EQUAL -1)
     message(FATAL_ERROR "PROBANTE: contrato de interface ausente: ${marker}")
@@ -26,7 +27,7 @@ foreach(marker IN ITEMS
 endforeach()
 
 file(READ "${script}" javascript)
-foreach(endpoint IN ITEMS "/api/health" "/api/readiness" "/api/capabilities" "/api/v1/auth/request-code" "/api/v1/auth/verify-code" "/api/v1/auth/me" "/api/v1/auth/logout")
+foreach(endpoint IN ITEMS "/api/health" "/api/readiness" "/api/capabilities" "/api/v1/auth/request-code" "/api/v1/auth/verify-code" "/api/v1/auth/me" "/api/v1/auth/logout" "/api/v1/auth/csrf" "/api/v1/connectors/redape/ingest")
   string(FIND "${javascript}" "${endpoint}" found)
   if(found EQUAL -1)
     message(FATAL_ERROR "PROBANTE: frontend não observa endpoint: ${endpoint}")

@@ -43,6 +43,9 @@ void setup_admin(std::string_view connection, std::string_view email,
                                                       std::string_view pepper);
 [[nodiscard]] std::optional<User> authenticate(std::string_view connection,
                                                 std::string_view session_token);
+[[nodiscard]] bool verify_csrf(const User& user, std::string_view csrf_token);
+[[nodiscard]] std::optional<std::string> refresh_csrf(std::string_view connection,
+                                                       std::string_view session_token);
 [[nodiscard]] bool logout(std::string_view connection, std::string_view session_token,
                           std::string_view csrf_token);
 

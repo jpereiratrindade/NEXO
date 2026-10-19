@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include "nexo/auth.hpp"
+#include "nexo/redape.hpp"
 
 #include <algorithm>
 #include <array>
@@ -22,7 +23,7 @@ namespace {
 constexpr std::string_view health =
     R"({"schema":"nexo.health/1.0.0","status":"ok","complete":false})";
 constexpr std::string_view capabilities =
-    R"({"schema":"nexo.capabilities/1.0.0","capabilities":[{"id":"external-reference.validate","version":"1.0.0"}]})";
+    R"({"schema":"nexo.capabilities/1.0.0","capabilities":[{"id":"external-reference.validate","version":"1.0.0"},{"id":"connector.redape.ingest","version":"1.0.0"}]})";
 
 struct Response {
     int status;
@@ -199,6 +200,53 @@ Response response_for(const std::string_view request) {
         } catch (const std::exception&) {
             return {503, "Service Unavailable", "application/json",
                     R"({"error":{"code":"auth_unavailable","message":"Autenticação indisponível"}})", {}};
+        }
+    }
+    if (request.starts_with("POST /api/v1/auth/csrf ")) {
+        try {
+            const auto token = nexo::auth::refresh_csrf(database_url(), session_cookie(request));
+            if (!token)
+                return {401, "Unauthorized", "application/json",
+                        R"({"error":{"code":"unauthenticated","message":"Autenticação necessária"}})", {}};
+            return {200, "OK", "application/json", "{\"csrf_token\":\"" + *token + "\"}", {}};
+        } catch (const std::exception&) {
+            return {503, "Service Unavailable", "application/json",
+                    R"({"error":{"code":"auth_unavailable","message":"Autenticação indisponível"}})", {}};
+        }
+    }
+    if (request.starts_with("POST /api/v1/connectors/redape/ingest ")) {
+        try {
+            const auto user = nexo::auth::authenticate(database_url(), session_cookie(request));
+            if (!user)
+                return {401, "Unauthorized", "application/json",
+                        R"({"error":{"code":"unauthenticated","message":"Autenticação necessária"}})", {}};
+            if (!nexo::auth::verify_csrf(*user, header_of(request, "X-CSRF-Token")))
+                return {403, "Forbidden", "application/json",
+                        R"({"error":{"code":"csrf_failed","message":"Token CSRF inválido"}})", {}};
+            auto term = json_field(body_of(request), "query");
+            if (term.size() > 200)
+                return {422, "Unprocessable Entity", "application/json",
+                        R"({"error":{"code":"invalid_query","message":"Consulta excede 200 caracteres"}})", {}};
+            std::size_t limit = 10;
+            const auto requested_limit = json_field(body_of(request), "limit");
+            if (!requested_limit.empty()) {
+                const auto parsed = std::from_chars(requested_limit.data(),
+                                                     requested_limit.data() + requested_limit.size(), limit);
+                if (parsed.ec != std::errc{} || parsed.ptr != requested_limit.data() + requested_limit.size() ||
+                    limit < 1 || limit > 100)
+                    return {422, "Unprocessable Entity", "application/json",
+                            R"({"error":{"code":"invalid_limit","message":"Limite deve estar entre 1 e 100"}})", {}};
+            }
+            const auto receipt = nexo::redape::ingest(database_url(), term, limit);
+            return {200, "OK", "application/json",
+                    "{\"provider_id\":\"redape\",\"discovered\":" +
+                        std::to_string(receipt.discovered) + ",\"cataloged\":" +
+                        std::to_string(receipt.cataloged) + ",\"total_available\":" +
+                        std::to_string(receipt.total_available) + "}", {}};
+        } catch (const std::exception& error) {
+            std::cerr << "[NEXO REDAPE] " << error.what() << '\n';
+            return {502, "Bad Gateway", "application/json",
+                    R"({"error":{"code":"redape_unavailable","message":"Não foi possível consultar o REDAPE"}})", {}};
         }
     }
 

@@ -175,12 +175,29 @@ std::optional<User> authenticate(const std::string_view connection,
 bool logout(const std::string_view connection, const std::string_view session_token,
             const std::string_view csrf_token) {
     const auto user = authenticate(connection, session_token);
-    const auto csrf_hash = sha256(csrf_token);
-    if (!user || CRYPTO_memcmp(user->csrf_hash.data(), csrf_hash.data(), 64) != 0) return false;
+    if (!user || !verify_csrf(*user, csrf_token)) return false;
     auto db = connect(connection);
     query(db.get(), "UPDATE nexo_sessions SET revoked_at=now() WHERE secret_hash=$1",
           {sha256(session_token)});
     return true;
+}
+
+bool verify_csrf(const User& user, const std::string_view csrf_token) {
+    if (csrf_token.empty() || user.csrf_hash.size() != SHA256_DIGEST_LENGTH * 2) return false;
+    const auto csrf_hash = sha256(csrf_token);
+    return CRYPTO_memcmp(user.csrf_hash.data(), csrf_hash.data(), csrf_hash.size()) == 0;
+}
+
+std::optional<std::string> refresh_csrf(const std::string_view connection,
+                                        const std::string_view session_token) {
+    if (session_token.empty()) return std::nullopt;
+    const auto token = random_hex();
+    auto db = connect(connection);
+    auto result = query(db.get(),
+        "UPDATE nexo_sessions SET csrf_hash=$1 WHERE secret_hash=$2 AND revoked_at IS NULL AND expires_at>now() RETURNING session_id",
+        {sha256(token), sha256(session_token)});
+    if (PQntuples(result.get()) != 1) return std::nullopt;
+    return token;
 }
 
 }  // namespace nexo::auth

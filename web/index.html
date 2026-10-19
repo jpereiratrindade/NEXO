@@ -56,6 +56,7 @@
     </a>
     <nav aria-label="Navegação principal">
       <a href="#sistema">Sistema</a>
+      <a href="#redape">REDAPE</a>
       <a href="#fronteira">Fronteira</a>
       <a href="#contratos">Contratos</a>
     </nav>
@@ -102,6 +103,20 @@
           <div class="meter"><span id="ready-meter"></span></div>
         </article>
       </div>
+    </section>
+
+    <section class="redape" id="redape" aria-labelledby="redape-title">
+      <div class="redape-copy">
+        <span class="kicker">Conector Dataverse · Embrapa</span>
+        <h2 id="redape-title">Ingerir referências do REDAPE.</h2>
+        <p>Descubra datasets publicados e catalogue identidade, versão e origem. Os dados científicos e a resposta do provedor não são incorporados ao NEXO.</p>
+      </div>
+      <form class="ingest-form" id="redape-ingest-form">
+        <label>Termo de busca<input name="query" maxlength="200" placeholder="Ex.: solos, genômica, carbono"></label>
+        <label>Quantidade<select name="limit"><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
+        <button type="submit">Ingerir referências</button>
+        <p id="redape-result" role="status">Somente metadados públicos publicados.</p>
+      </form>
     </section>
 
     <section class="boundary" id="fronteira" aria-labelledby="boundary-title">

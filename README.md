@@ -29,6 +29,7 @@ Este projeto é um MVP isolado. Não substitui `sister-nexo`.
 - código de desenvolvimento associado a um e-mail `@embrapa.br` informado;
 - código de uso único com expiração e limite de tentativas;
 - sessão opaca, CSRF e cookie HttpOnly;
+- ingestão de referências públicas do REDAPE via API Dataverse;
 - testes do domínio e dos contratos.
 
 ## Build

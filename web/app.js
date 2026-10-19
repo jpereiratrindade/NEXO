@@ -3,12 +3,26 @@ let csrf = sessionStorage.getItem('nexo_csrf') || '';
 let challenge = '';
 let pendingEmail = '';
 
-async function authApi(path, init = {}) {
+async function refreshCsrf() {
+  const response = await fetch('/api/v1/auth/csrf', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}'
+  });
+  const value = await response.json().catch(() => ({}));
+  if (!response.ok || !value.csrf_token) throw new Error(value.error?.message || 'Sessão inválida');
+  csrf = value.csrf_token;
+  sessionStorage.setItem('nexo_csrf', csrf);
+}
+
+async function authApi(path, init = {}, retryCsrf = true) {
   const headers = new Headers(init.headers);
   headers.set('Content-Type', 'application/json');
   if (csrf) headers.set('X-CSRF-Token', csrf);
   const response = await fetch(path, { ...init, headers });
   const value = await response.json().catch(() => ({}));
+  if (!response.ok && response.status === 403 && value.error?.code === 'csrf_failed' && retryCsrf) {
+    await refreshCsrf();
+    return authApi(path, init, false);
+  }
   if (!response.ok) throw new Error(value.error?.message || 'Erro de autenticação');
   return value;
 }
@@ -29,6 +43,7 @@ function showEmailStep() {
 async function authenticate() {
   try {
     await authApi('/api/v1/auth/me');
+    if (!csrf) await refreshCsrf();
     unlock();
   } catch (_) {
     document.body.classList.add('auth-locked');
@@ -93,6 +108,25 @@ $('#logout').addEventListener('click', async () => {
   sessionStorage.removeItem('nexo_csrf');
   showEmailStep();
   document.body.classList.add('auth-locked');
+});
+
+$('#redape-ingest-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const output = $('#redape-result');
+  const button = event.currentTarget.querySelector('button');
+  output.textContent = 'Consultando REDAPE…';
+  button.disabled = true;
+  try {
+    const payload = Object.fromEntries(new FormData(event.currentTarget));
+    const result = await authApi('/api/v1/connectors/redape/ingest', {
+      method: 'POST', body: JSON.stringify(payload)
+    });
+    output.textContent = `${result.cataloged} referência(s) catalogada(s); ${result.total_available} disponível(is) no resultado remoto.`;
+  } catch (failure) {
+    output.textContent = failure.message;
+  } finally {
+    button.disabled = false;
+  }
 });
 
 function updateClock() {

@@ -1,12 +1,15 @@
 set(required_files
   "${ROOT}/contracts/external-reference.schema.json"
   "${ROOT}/contracts/connector-capabilities.schema.json"
+  "${ROOT}/contracts/connectors/redape.capabilities.json"
   "${ROOT}/docs/adr/ADR-0001-federation-and-scientific-provenance.md"
   "${ROOT}/storage/migrations/001_initial.sql"
   "${ROOT}/storage/migrations/002_authentication.sql"
   "${ROOT}/storage/migrations/003_embrapa_email_identity.sql"
   "${ROOT}/storage/migrations/004_email_login_codes.sql"
-  "${ROOT}/storage/migrations/005_remove_password_credential.sql")
+  "${ROOT}/storage/migrations/005_remove_password_credential.sql"
+  "${ROOT}/storage/migrations/006_register_redape_provider.sql"
+  "${ROOT}/storage/migrations/007_correct_redape_authority.sql")
 
 foreach(file IN LISTS required_files)
   if(NOT EXISTS "${file}")
