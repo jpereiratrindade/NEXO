@@ -252,8 +252,10 @@ Response response_for(const std::string_view request) {
                 .subject = json_field(body_of(request), "subject"),
                 .state = json_field(body_of(request), "state"),
                 .match = json_field(body_of(request), "match"),
+                .sort = json_field(body_of(request), "sort"),
             };
             if (criteria.match.empty()) criteria.match = "any";
+            if (criteria.sort.empty()) criteria.sort = "relevance";
             if (criteria.general.size() > 200 || criteria.title.size() > 200 ||
                 criteria.author.size() > 200 || criteria.description.size() > 200 ||
                 criteria.keyword.size() > 200 || criteria.subject.size() > 100 ||
@@ -263,6 +265,9 @@ Response response_for(const std::string_view request) {
             if (criteria.match != "any" && criteria.match != "all")
                 return {422, "Unprocessable Entity", "application/json",
                         R"({"error":{"code":"invalid_match","message":"Combinação de critérios inválida"}})", {}};
+            if (criteria.sort != "relevance" && criteria.sort != "date")
+                return {422, "Unprocessable Entity", "application/json",
+                        R"({"error":{"code":"invalid_sort","message":"Ordenação inválida"}})", {}};
             const auto requested_limit = json_field(body_of(request), "limit");
             if (!requested_limit.empty()) {
                 const auto parsed = std::from_chars(requested_limit.data(),

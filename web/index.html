@@ -118,6 +118,7 @@
           <summary>Pesquisa avançada</summary>
           <div class="advanced-fields">
             <label>Combinar critérios<select name="match"><option value="any">Qualquer critério (OR)</option><option value="all">Todos os critérios (AND)</option></select></label>
+            <label>Ordenação<select name="sort"><option value="relevance">Mais relevantes (score)</option><option value="date">Mais recentes (data)</option></select></label>
             <label>Título<input name="title" maxlength="200"></label>
             <label>Autor<input name="author" maxlength="200"></label>
             <label>Descrição<input name="description" maxlength="200"></label>
@@ -132,7 +133,7 @@
         <a class="advanced-search" href="https://www.redape.dados.embrapa.br/dataverse/redape/search" target="_blank" rel="noopener noreferrer">Abrir pesquisa original no REDAPE ↗</a>
         <p id="redape-result" role="status">Pesquisa sem persistência; catalogação apenas por ação explícita.</p>
       </form>
-      <p class="nexo-results-guidance">Selecione “Ver detalhes” em cada cartão para inspecionar os metadados informados pela busca.</p>
+      <p class="nexo-results-guidance">Use aspas para expressões exatas (ex.: <code>"estoque de carbono"</code>) ou <code>AND</code> para exigir termos combinados. Selecione “Ver detalhes” em cada cartão para inspecionar os metadados informados pela busca.</p>
       <ol class="redape-results" id="redape-results" aria-label="Referências encontradas"></ol>
       <section class="graph-analysis" aria-labelledby="graph-title">
         <div class="graph-intro">

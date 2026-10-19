@@ -40,5 +40,15 @@ int main() {
         std::cerr << "FAIL: combinação inclusiva dos critérios\n";
         return EXIT_FAILURE;
     }
+    const nexo::redape::SearchCriteria phrase_criteria{.general = "\"carbono no solo\""};
+    if (nexo::redape::build_query(phrase_criteria) != "(\"carbono no solo\")") {
+        std::cerr << "FAIL: preservacao de aspas para consulta por frase\n";
+        return EXIT_FAILURE;
+    }
+    const nexo::redape::SearchCriteria bool_criteria{.general = "solo AND agua"};
+    if (nexo::redape::build_query(bool_criteria) != "(solo AND agua)") {
+        std::cerr << "FAIL: preservacao de operadores booleanos na busca geral\n";
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }

@@ -72,11 +72,23 @@ std::string solr_phrase(const std::string_view value) {
 }
 
 std::string solr_terms(const std::string_view value) {
-    constexpr std::string_view reserved = "+-!(){}[]^\"~*?:\\/";
+    constexpr std::string_view reserved = "+-!(){}[]^~*?:\\/\"";
+    const auto quote_count = std::ranges::count(value, '"');
+    const bool preserve_quotes = (quote_count > 0 && quote_count % 2 == 0);
+
     std::string escaped_value;
+    escaped_value.reserve(value.size() + 4);
+    bool in_quotes = false;
     for (const char character : value) {
-        if (reserved.find(character) != std::string_view::npos) escaped_value.push_back('\\');
-        escaped_value.push_back(character);
+        if (character == '"' && preserve_quotes) {
+            in_quotes = !in_quotes;
+            escaped_value.push_back('"');
+        } else if (!in_quotes && reserved.find(character) != std::string_view::npos) {
+            escaped_value.push_back('\\');
+            escaped_value.push_back(character);
+        } else {
+            escaped_value.push_back(character);
+        }
     }
     return "(" + escaped_value + ")";
 }
@@ -140,9 +152,13 @@ Discovery discover(const SearchCriteria& criteria) {
     std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), &curl_easy_cleanup);
     if (!curl) throw std::runtime_error("cliente HTTP indisponível");
     const auto term = build_query(criteria);
+    std::string sort_clause;
+    if (criteria.sort == "date" || term == "*") {
+        sort_clause = "&sort=date&order=desc";
+    }
     const auto url = std::string(search_endpoint) + "?q=" + escaped(curl.get(), term) +
-        "&type=dataset&subtree=redape&fq=publicationStatus%3APublished&sort=date&order=desc&per_page=" +
-        std::to_string(limit);
+        "&type=dataset&subtree=redape&fq=publicationStatus%3APublished" + sort_clause +
+        "&per_page=" + std::to_string(limit);
     std::string response;
     curl_easy_setopt(curl.get(), CURLOPT_URL, url.c_str());
     curl_easy_setopt(curl.get(), CURLOPT_USERAGENT, "NEXO/0.1 redape-connector");
@@ -177,7 +193,7 @@ IngestReceipt ingest(const std::string_view connection, const SearchCriteria& cr
                                        {"author", criteria.author}, {"description", criteria.description},
                                        {"keyword", criteria.keyword}, {"subject", criteria.subject},
                                        {"state", criteria.state}, {"match", criteria.match},
-                                       {"limit", criteria.limit}};
+                                       {"sort", criteria.sort}, {"limit", criteria.limit}};
             const nlohmann::json receipt{{"source", std::string(search_endpoint)},
                                          {"total_available", discovery.total_available}};
             query(db.get(),

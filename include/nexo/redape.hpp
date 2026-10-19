@@ -23,6 +23,7 @@ struct SearchCriteria {
     std::string subject;
     std::string state;
     std::string match{"any"};
+    std::string sort{"relevance"};
     std::size_t limit{10};
 };
 
