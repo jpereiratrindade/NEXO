@@ -17,7 +17,7 @@ Backend escrito em C++26.
 
 Este projeto é um MVP isolado. Não substitui `sister-nexo`.
 
-## Estado do incremento 0
+## Estado atual
 
 - modelo de referência externa verificável;
 - contrato genérico de conector;
@@ -25,7 +25,7 @@ Este projeto é um MVP isolado. Não substitui `sister-nexo`.
 - servidor HTTP mínimo em `127.0.0.1`;
 - endpoints `/api/health`, `/api/readiness` e `/api/capabilities`;
 - interface web responsiva servida na raiz `/`;
-- autenticação local sem senha, baseada no padrão OTP do ContextLab;
+- autenticação local sem senha, baseada em código de uso único;
 - código de desenvolvimento associado a um e-mail `@embrapa.br` informado;
 - código de uso único com expiração e limite de tentativas;
 - sessão opaca, CSRF e cookie HttpOnly;
@@ -44,8 +44,8 @@ invariante observável do domínio, dos contratos ou da experiência web.
 
 ## Executar
 
-No Fedora com Podman, o lançador prepara PostgreSQL, aplica migrações no primeiro
-volume, compila e inicia o NEXO:
+No Fedora com Podman, o lançador prepara PostgreSQL, aplica migrações pendentes,
+compila e inicia o NEXO:
 
 ```bash
 ./scripts/run-local.sh
@@ -68,10 +68,9 @@ Defina `NEXO_DATABASE_URL`, aplique as migrações e crie o primeiro administrad
 ```bash
 export NEXO_DATABASE_URL='postgresql://...'
 export NEXO_AUTH_PEPPER='segredo-aleatorio-com-no-minimo-32-caracteres'
-psql "$NEXO_DATABASE_URL" -f storage/migrations/001_initial.sql
-psql "$NEXO_DATABASE_URL" -f storage/migrations/002_authentication.sql
-psql "$NEXO_DATABASE_URL" -f storage/migrations/003_embrapa_email_identity.sql
-psql "$NEXO_DATABASE_URL" -f storage/migrations/004_email_login_codes.sql
+for migration in storage/migrations/*.sql; do
+  psql "$NEXO_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+done
 ./build/nexo-server setup-admin --email nome@embrapa.br --display-name "Administrador"
 ```
 

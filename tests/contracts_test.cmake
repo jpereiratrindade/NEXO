@@ -5,7 +5,8 @@ set(required_files
   "${ROOT}/storage/migrations/001_initial.sql"
   "${ROOT}/storage/migrations/002_authentication.sql"
   "${ROOT}/storage/migrations/003_embrapa_email_identity.sql"
-  "${ROOT}/storage/migrations/004_email_login_codes.sql")
+  "${ROOT}/storage/migrations/004_email_login_codes.sql"
+  "${ROOT}/storage/migrations/005_remove_password_credential.sql")
 
 foreach(file IN LISTS required_files)
   if(NOT EXISTS "${file}")

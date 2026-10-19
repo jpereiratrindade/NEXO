@@ -8,7 +8,6 @@
 #include <algorithm>
 #include <array>
 #include <charconv>
-#include <chrono>
 #include <cctype>
 #include <cstdlib>
 #include <filesystem>
@@ -17,14 +16,11 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <thread>
 
 namespace {
 
 constexpr std::string_view health =
-    R"({"schema":"nexo.health/1.0.0","status":"ok","ready":true,"complete":false})";
-constexpr std::string_view readiness =
-    R"({"schema":"nexo.readiness/1.0.0","ready":true,"complete":false,"dependencies":{}})";
+    R"({"schema":"nexo.health/1.0.0","status":"ok","complete":false})";
 constexpr std::string_view capabilities =
     R"({"schema":"nexo.capabilities/1.0.0","capabilities":[{"id":"external-reference.validate","version":"1.0.0"}]})";
 
@@ -108,8 +104,17 @@ std::string load_asset(const std::string_view filename) {
 Response response_for(const std::string_view request) {
     if (request.starts_with("GET /api/health "))
         return {200, "OK", "application/json", std::string(health), {}};
-    if (request.starts_with("GET /api/readiness "))
-        return {200, "OK", "application/json", std::string(readiness), {}};
+    if (request.starts_with("GET /api/readiness ")) {
+        const bool postgres = nexo::auth::database_ready(database_url());
+        const bool auth_pepper = environment("NEXO_AUTH_PEPPER").size() >= 32;
+        const bool ready = postgres && auth_pepper;
+        return {ready ? 200 : 503, ready ? "OK" : "Service Unavailable", "application/json",
+                std::string{"{\"schema\":\"nexo.readiness/1.0.0\",\"ready\":"} +
+                    (ready ? "true" : "false") +
+                    ",\"complete\":false,\"dependencies\":{\"postgresql\":" +
+                    (postgres ? "true" : "false") + ",\"auth_pepper\":" +
+                    (auth_pepper ? "true" : "false") + "}}", {}};
+    }
     if (request.starts_with("GET /api/capabilities "))
         return {200, "OK", "application/json", std::string(capabilities), {}};
 

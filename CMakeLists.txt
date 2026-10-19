@@ -18,7 +18,7 @@ target_link_libraries(nexo_auth PRIVATE OpenSSL::Crypto PostgreSQL::PostgreSQL)
 target_compile_options(nexo_auth PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
 add_executable(nexo-server src/main.cpp)
-target_link_libraries(nexo-server PRIVATE nexo_domain nexo_auth)
+target_link_libraries(nexo-server PRIVATE nexo_auth)
 target_compile_options(nexo-server PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 target_compile_definitions(nexo-server PRIVATE NEXO_WEB_ROOT="${CMAKE_CURRENT_BINARY_DIR}/web")
 

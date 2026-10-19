@@ -5,7 +5,6 @@
 #include <openssl/rand.h>
 #include <openssl/sha.h>
 
-#include <algorithm>
 #include <cctype>
 #include <cstdint>
 #include <memory>
@@ -103,7 +102,7 @@ void setup_admin(const std::string_view connection, const std::string_view email
                  const std::string_view display_name) {
     if (!is_embrapa_email(email)) throw std::invalid_argument("e-mail deve pertencer ao domínio @embrapa.br");
     auto db = connect(connection);
-    query(db.get(), "INSERT INTO nexo_users(email,display_name,password_hash,role,active) VALUES($1,$2,NULL,'admin',true) ON CONFLICT(email) DO UPDATE SET display_name=excluded.display_name,role='admin',active=true,updated_at=now()",
+    query(db.get(), "INSERT INTO nexo_users(email,display_name,role,active) VALUES($1,$2,'admin',true) ON CONFLICT(email) DO UPDATE SET display_name=excluded.display_name,role='admin',active=true,updated_at=now()",
           {std::string(email), std::string(display_name)});
 }
 
@@ -145,7 +144,7 @@ std::optional<LoginResult> verify_code(const std::string_view connection,
         auto consumed = query(db.get(), "UPDATE nexo_login_codes SET consumed_at=now() WHERE challenge_id=$1 AND consumed_at IS NULL RETURNING email",
                               {std::string(challenge_id)});
         if (PQntuples(consumed.get()) != 1) { query(db.get(), "ROLLBACK"); return std::nullopt; }
-        auto user = query(db.get(), "INSERT INTO nexo_users(email,display_name,password_hash,role,active) VALUES($1,$1,NULL,'reader',true) ON CONFLICT(email) DO UPDATE SET active=true,updated_at=now() RETURNING user_id::text,email,display_name,role",
+        auto user = query(db.get(), "INSERT INTO nexo_users(email,display_name,role,active) VALUES($1,$1,'reader',true) ON CONFLICT(email) DO UPDATE SET active=true,updated_at=now() RETURNING user_id::text,email,display_name,role",
                           {email});
         const auto token = random_hex();
         const auto csrf = random_hex();
