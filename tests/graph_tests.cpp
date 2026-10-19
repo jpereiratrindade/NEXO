@@ -54,6 +54,28 @@ int main() {
         std::cerr << "FAIL: analise de documento unico falhou\n";
         return EXIT_FAILURE;
     }
+    const auto multidim = nexo::graph::learn({
+        {
+            .id = "d1",
+            .title = "Comportamento agronômico no semiárido",
+            .uri = "https://example.org/d1",
+            .description = "Avaliação de germoplasma e variedades tradicionais",
+            .keywords = {"agrobiodiversidade", "banco de germoplasma"}
+        },
+        {
+            .id = "d2",
+            .title = "Diagnóstico etnobotânico em comunidades rurais",
+            .uri = "https://example.org/d2",
+            .description = "Levantamento participativo de recursos genéticos vegetais",
+            .keywords = {"agrobiodiversidade", "banco de germoplasma"}
+        }
+    });
+    if (multidim.edges.empty() || multidim.edges.front().weight < 0.2) {
+        std::cerr << "FAIL: articulacao semantica por palavras-chave e resumo falhou; size="
+                  << multidim.edges.size()
+                  << " weight=" << (multidim.edges.empty() ? 0.0 : multidim.edges.front().weight) << '\n';
+        return EXIT_FAILURE;
+    }
     const char* db_url = std::getenv("NEXO_DATABASE_URL");
     if (db_url != nullptr && *db_url != '\0') {
         auto cat_run = nexo::graph::run(db_url);

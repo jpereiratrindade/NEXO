@@ -11,6 +11,12 @@ struct Document {
     std::string id;
     std::string title;
     std::string uri;
+    std::string description{};
+    std::vector<std::string> keywords{};
+    std::vector<std::string> authors{};
+    std::vector<std::string> subjects{};
+    std::string collection_name{};
+    int restricted_files{0};
 };
 
 struct Edge {

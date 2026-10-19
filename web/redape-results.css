@@ -138,6 +138,10 @@
 .graph-badge.bridge { background: #fee8d0; color: #8e3e00; border: 1px solid #f8bd84; }
 .graph-badge.community-tag { background: #008da3; color: white; cursor: pointer; }
 .graph-badge.community-tag:hover { opacity: .9; }
+.graph-badge.restricted, .nexo-badge--restricted { background: #fde8e8; color: #9c1a1a; border: 1px solid #f8b4b4; }
+.nexo-result-authors, .graph-node-meta-line { font-size: .82rem; color: #3b536b; margin: .2rem 0; line-height: 1.4; }
+.nexo-result-keywords { display: flex; flex-wrap: wrap; gap: .3rem; margin: .3rem 0; }
+.graph-node-meta-desc { font-size: .82rem; color: #2c4257; background: #edf4f8; padding: .6rem .8rem; border-radius: 6px; border-left: 3px solid #008da3; margin: .6rem 0; line-height: 1.45; }
 
 .graph-evidence-list { list-style: none; padding: 0; margin: .8rem 0; display: grid; gap: .6rem; max-height: 18rem; overflow-y: auto; }
 .graph-evidence-item { padding: .7rem; background: #f4f8fc; border: 1px solid #d3e1ec; border-radius: 6px; }

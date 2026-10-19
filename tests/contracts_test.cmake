@@ -10,7 +10,8 @@ set(required_files
   "${ROOT}/storage/migrations/005_remove_password_credential.sql"
   "${ROOT}/storage/migrations/006_register_redape_provider.sql"
   "${ROOT}/storage/migrations/007_correct_redape_authority.sql"
-  "${ROOT}/storage/migrations/008_graph_learning.sql")
+  "${ROOT}/storage/migrations/008_graph_learning.sql"
+  "${ROOT}/storage/migrations/009_scientific_metadata.sql")
 
 foreach(file IN LISTS required_files)
   if(NOT EXISTS "${file}")

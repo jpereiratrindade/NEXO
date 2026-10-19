@@ -59,6 +59,21 @@ std::string version_of(const nlohmann::json& item) {
     return std::to_string(major) + "." + std::to_string(minor);
 }
 
+std::string to_pg_array(const std::vector<std::string>& items) {
+    std::string array_literal = "{";
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        if (i > 0) array_literal += ',';
+        array_literal += '"';
+        for (const char c : items[i]) {
+            if (c == '"' || c == '\\') array_literal += '\\';
+            array_literal += c;
+        }
+        array_literal += '"';
+    }
+    array_literal += '}';
+    return array_literal;
+}
+
 std::string solr_phrase(const std::string_view value) {
     std::string escaped_value;
     escaped_value.reserve(value.size() + 2);
@@ -154,6 +169,33 @@ Discovery parse_search_response(const std::string_view response) {
         };
         const auto version = version_of(item);
         if (!version.empty()) reference.version = version;
+        if (item.contains("description") && item["description"].is_string()) {
+            reference.description = item["description"].get<std::string>();
+        }
+        if (item.contains("keywords") && item["keywords"].is_array()) {
+            for (const auto& kw : item["keywords"]) {
+                if (kw.is_string() && !kw.get<std::string>().empty())
+                    reference.keywords.push_back(kw.get<std::string>());
+            }
+        }
+        if (item.contains("authors") && item["authors"].is_array()) {
+            for (const auto& a : item["authors"]) {
+                if (a.is_string() && !a.get<std::string>().empty())
+                    reference.authors.push_back(a.get<std::string>());
+            }
+        }
+        if (item.contains("subjects") && item["subjects"].is_array()) {
+            for (const auto& s : item["subjects"]) {
+                if (s.is_string() && !s.get<std::string>().empty())
+                    reference.subjects.push_back(s.get<std::string>());
+            }
+        }
+        if (item.contains("name_of_dataverse") && item["name_of_dataverse"].is_string()) {
+            reference.collection_name = item["name_of_dataverse"].get<std::string>();
+        }
+        if (item.contains("fileCount") && item["fileCount"].is_number_integer()) {
+            reference.restricted_files = item["fileCount"].get<int>();
+        }
         if (validate(reference).empty()) discovery.references.push_back(std::move(reference));
     }
     return discovery;
@@ -225,9 +267,25 @@ IngestReceipt ingest(const std::string_view connection, const SearchCriteria& cr
     try {
         for (const auto& reference : discovery.references) {
             auto stored = query(db.get(),
-                "INSERT INTO nexo_external_references(provider_id,external_id,title,canonical_uri,version,observed_at,access_class) VALUES('redape',$1,$2,$3,NULLIF($4,''),$5::timestamptz,'public') ON CONFLICT (provider_id,external_id,version) DO UPDATE SET title=excluded.title,canonical_uri=excluded.canonical_uri,observed_at=excluded.observed_at,access_class='public' RETURNING reference_id::text",
+                "INSERT INTO nexo_external_references("
+                "provider_id,external_id,title,canonical_uri,version,observed_at,access_class,"
+                "description,keywords,authors,subjects,collection_name,restricted_files"
+                ") VALUES('redape',$1,$2,$3,NULLIF($4,''),$5::timestamptz,$6,$7,$8::text[],$9::text[],$10::text[],$11,$12::int) "
+                "ON CONFLICT (provider_id,external_id,version) DO UPDATE SET "
+                "title=excluded.title,canonical_uri=excluded.canonical_uri,observed_at=excluded.observed_at,"
+                "access_class=excluded.access_class,description=excluded.description,keywords=excluded.keywords,"
+                "authors=excluded.authors,subjects=excluded.subjects,collection_name=excluded.collection_name,"
+                "restricted_files=excluded.restricted_files "
+                "RETURNING reference_id::text",
                 {reference.external_id, reference.title, reference.canonical_uri,
-                 reference.version.value_or(""), reference.observed_at});
+                 reference.version.value_or(""), reference.observed_at,
+                 std::string(to_string(reference.access_class)),
+                 reference.description.value_or(""),
+                 to_pg_array(reference.keywords),
+                 to_pg_array(reference.authors),
+                 to_pg_array(reference.subjects),
+                 reference.collection_name.value_or(""),
+                 std::to_string(reference.restricted_files)});
             const nlohmann::json scope{{"query", criteria.general}, {"title", criteria.title},
                                        {"author", criteria.author}, {"description", criteria.description},
                                        {"keyword", criteria.keyword}, {"subject", criteria.subject},

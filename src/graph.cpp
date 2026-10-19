@@ -91,6 +91,32 @@ Result query(PGconn* db, const char* sql, const std::vector<std::string>& values
     return result;
 }
 
+std::vector<std::string> parse_pg_array(const std::string_view raw) {
+    if (raw.size() < 2 || raw.front() != '{' || raw.back() != '}') return {};
+    std::vector<std::string> items;
+    std::string current;
+    bool in_quotes = false;
+    bool escaped = false;
+    for (std::size_t i = 1; i + 1 < raw.size(); ++i) {
+        const char c = raw[i];
+        if (escaped) {
+            current.push_back(c);
+            escaped = false;
+        } else if (c == '\\') {
+            escaped = true;
+        } else if (c == '"') {
+            in_quotes = !in_quotes;
+        } else if (c == ',' && !in_quotes) {
+            items.push_back(std::move(current));
+            current.clear();
+        } else {
+            current.push_back(c);
+        }
+    }
+    if (!current.empty() || in_quotes) items.push_back(std::move(current));
+    return items;
+}
+
 }  // namespace
 
 Analysis learn(std::vector<Document> documents) {
@@ -103,8 +129,19 @@ Analysis learn(std::vector<Document> documents) {
     std::vector<std::map<std::string, std::size_t>> frequencies(count);
     std::map<std::string, std::size_t> document_frequency;
     for (std::size_t index = 0; index < count; ++index) {
-        for (const auto& token : tokenize(analysis.documents[index].title))
-            ++frequencies[index][token];
+        const auto& doc = analysis.documents[index];
+        // 1. Palavras-chave controladas (Thesagro / Agrovoc): peso 3
+        for (const auto& kw : doc.keywords) {
+            for (const auto& token : tokenize(kw))
+                frequencies[index][token] += 3;
+        }
+        // 2. Título da obra (peso 2)
+        for (const auto& token : tokenize(doc.title))
+            frequencies[index][token] += 2;
+        // 3. Resumo metodológico e descrição (peso 1)
+        for (const auto& token : tokenize(doc.description))
+            frequencies[index][token] += 1;
+
         for (const auto& [term, unused] : frequencies[index]) {
             (void)unused;
             ++document_frequency[term];
@@ -221,6 +258,13 @@ Analysis run(const std::string_view connection,
              const std::string_view query_filter,
              const std::vector<std::string>& reference_ids) {
     auto db = connect(connection);
+    const std::string select_cols =
+        "SELECT reference_id::text, title, canonical_uri, "
+        "COALESCE(description, ''), COALESCE(keywords, '{}'), "
+        "COALESCE(authors, '{}'), COALESCE(subjects, '{}'), "
+        "COALESCE(collection_name, ''), COALESCE(restricted_files, 0) "
+        "FROM nexo_external_references ";
+
     Result source{nullptr, &PQclear};
     if (!reference_ids.empty()) {
         std::string array_literal = "{";
@@ -235,21 +279,31 @@ Analysis run(const std::string_view connection,
         }
         array_literal += '}';
         source = query(db.get(),
-                       "SELECT reference_id::text,title,canonical_uri FROM nexo_external_references WHERE reference_id::text = ANY($1::text[]) ORDER BY reference_id",
+                       (select_cols + "WHERE reference_id::text = ANY($1::text[]) ORDER BY reference_id").c_str(),
                        {array_literal});
     } else if (!query_filter.empty()) {
         source = query(db.get(),
-                       "SELECT reference_id::text,title,canonical_uri FROM nexo_external_references WHERE title ILIKE $1 ORDER BY reference_id",
-                       {"%" + std::string(query_filter) + "%"});
+                       (select_cols + "WHERE (title ILIKE $1 OR description ILIKE $1 OR $2 = ANY(keywords)) ORDER BY reference_id").c_str(),
+                       {"%" + std::string(query_filter) + "%", std::string(query_filter)});
     } else {
         source = query(db.get(),
-                       "SELECT reference_id::text,title,canonical_uri FROM nexo_external_references ORDER BY reference_id");
+                       (select_cols + "ORDER BY reference_id").c_str());
     }
 
     std::vector<Document> documents;
-    for (int row = 0; row < PQntuples(source.get()); ++row)
-        documents.push_back({PQgetvalue(source.get(), row, 0), PQgetvalue(source.get(), row, 1),
-                             PQgetvalue(source.get(), row, 2)});
+    for (int row = 0; row < PQntuples(source.get()); ++row) {
+        documents.push_back(Document{
+            .id = PQgetvalue(source.get(), row, 0),
+            .title = PQgetvalue(source.get(), row, 1),
+            .uri = PQgetvalue(source.get(), row, 2),
+            .description = PQgetvalue(source.get(), row, 3),
+            .keywords = parse_pg_array(PQgetvalue(source.get(), row, 4)),
+            .authors = parse_pg_array(PQgetvalue(source.get(), row, 5)),
+            .subjects = parse_pg_array(PQgetvalue(source.get(), row, 6)),
+            .collection_name = PQgetvalue(source.get(), row, 7),
+            .restricted_files = std::atoi(PQgetvalue(source.get(), row, 8))
+        });
+    }
     auto analysis = learn(std::move(documents));
     if (!reference_ids.empty()) {
         analysis.scope_label = "subset (" + std::to_string(reference_ids.size()) + " selecionados)";
@@ -308,7 +362,7 @@ Analysis run(const std::string_view connection,
 
 std::string to_json(const Analysis& analysis) {
     nlohmann::json result{{"schema", "nexo.emergent-graph/1.0.0"},
-                          {"algorithm", "title_tfidf+mutual_knn+weighted_label_propagation"},
+                          {"algorithm", "multidimensional_tfidf+mutual_knn+weighted_label_propagation"},
                           {"input_count", analysis.documents.size()},
                           {"edge_count", analysis.edges.size()},
                           {"neighbors", analysis.neighbors},
@@ -322,9 +376,18 @@ std::string to_json(const Analysis& analysis) {
     for (std::size_t index = 0; index < analysis.documents.size(); ++index) {
         const auto& document = analysis.documents[index];
         const auto& node = analysis.nodes[index];
-        result["nodes"].push_back({{"id", document.id}, {"title", document.title},
-                                    {"uri", document.uri}, {"community", node.community},
-                                    {"degree", node.degree}, {"bridge_score", node.bridge_score},
+        result["nodes"].push_back({{"id", document.id},
+                                    {"title", document.title},
+                                    {"uri", document.uri},
+                                    {"description", document.description},
+                                    {"keywords", document.keywords},
+                                    {"authors", document.authors},
+                                    {"subjects", document.subjects},
+                                    {"collection", document.collection_name},
+                                    {"restricted_files", document.restricted_files},
+                                    {"community", node.community},
+                                    {"degree", node.degree},
+                                    {"bridge_score", node.bridge_score},
                                     {"novelty_score", node.novelty_score}});
     }
     result["edges"] = nlohmann::json::array();

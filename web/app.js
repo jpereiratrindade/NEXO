@@ -139,11 +139,50 @@ function renderRedapeResult(reference) {
   id.textContent = reference.external_id || 'Identificador não informado';
   const version = document.createElement('span');
   version.textContent = reference.version ? `Versão ${reference.version}` : 'Versão não informada';
+  meta.append(id, version);
+
+  if (reference.collection) {
+    const collBadge = document.createElement('span');
+    collBadge.className = 'graph-badge';
+    collBadge.textContent = reference.collection;
+    meta.append(collBadge);
+  }
+
+  if (reference.restricted_files > 0) {
+    const restBadge = document.createElement('span');
+    restBadge.className = 'graph-badge restricted';
+    restBadge.textContent = `Salvaguarda Restrita (${reference.restricted_files} arq.)`;
+    restBadge.title = 'Contém arquivos com acesso restrito (Lei 13.123/2015 / TCPI)';
+    meta.append(restBadge);
+  }
+
   const prompt = document.createElement('span');
   prompt.className = 'nexo-result-prompt';
   prompt.textContent = 'Ver detalhes';
-  meta.append(id, version, prompt);
-  summary.append(title, meta);
+  meta.append(prompt);
+
+  summary.append(title);
+
+  if (Array.isArray(reference.authors) && reference.authors.length > 0) {
+    const authorsLine = document.createElement('span');
+    authorsLine.className = 'nexo-result-authors';
+    authorsLine.textContent = `Autores: ${reference.authors.slice(0, 3).join(', ')}${reference.authors.length > 3 ? ' et al.' : ''}`;
+    summary.append(authorsLine);
+  }
+
+  if (Array.isArray(reference.keywords) && reference.keywords.length > 0) {
+    const kwBox = document.createElement('div');
+    kwBox.className = 'nexo-result-keywords';
+    reference.keywords.slice(0, 4).forEach(kw => {
+      const chip = document.createElement('span');
+      chip.className = 'graph-token';
+      chip.textContent = kw;
+      kwBox.append(chip);
+    });
+    summary.append(kwBox);
+  }
+
+  summary.append(meta);
 
   const panel = document.createElement('div');
   panel.className = 'nexo-result-panel';
@@ -158,6 +197,14 @@ function renderRedapeResult(reference) {
   appendField('Fonte', 'REDAPE · Embrapa');
   appendField('Identificador', reference.external_id);
   appendField('Versão', reference.version);
+  if (reference.collection) appendField('Coleção / Dataverse', reference.collection);
+  if (Array.isArray(reference.authors) && reference.authors.length > 0)
+    appendField('Autores', reference.authors.join('; '));
+  if (Array.isArray(reference.keywords) && reference.keywords.length > 0)
+    appendField('Palavras-chave (Thesagro/Agrovoc)', reference.keywords.join(', '));
+  if (reference.description) appendField('Resumo metodológico', reference.description);
+  if (reference.restricted_files > 0)
+    appendField('Regime de Acesso', `Contém ${reference.restricted_files} arquivo(s) restrito(s) (salvaguarda legal sob Lei 13.123/2015 / TCPI)`);
   appendField('URL declarada', reference.canonical_uri);
   panel.append(fields);
 
@@ -603,6 +650,19 @@ function renderGraphNetwork(analysis) {
       novSpan.textContent = `Novidade ${Number(node.novelty_score).toFixed(2)}`;
       badges.append(novSpan);
     }
+    if (node.collection) {
+      const collSpan = document.createElement('span');
+      collSpan.className = 'graph-badge';
+      collSpan.textContent = node.collection;
+      badges.append(collSpan);
+    }
+    if (node.restricted_files > 0) {
+      const restSpan = document.createElement('span');
+      restSpan.className = 'graph-badge restricted';
+      restSpan.textContent = `Salvaguarda Restrita (${node.restricted_files} arq.)`;
+      restSpan.title = 'Contém arquivos com acesso restrito (Lei 13.123/2015 / TCPI)';
+      badges.append(restSpan);
+    }
     details.append(badges);
 
     const uri = safeRedapeUrl(node.uri);
@@ -612,7 +672,34 @@ function renderGraphNetwork(analysis) {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.textContent = 'Abrir referência original ↗';
+      link.style.display = 'inline-block';
+      link.style.marginBottom = '0.5rem';
       details.append(link);
+    }
+
+    if (Array.isArray(node.authors) && node.authors.length > 0) {
+      const authP = document.createElement('p');
+      authP.className = 'graph-node-meta-line';
+      authP.innerHTML = `<strong>Autores:</strong> ${node.authors.join('; ')}`;
+      details.append(authP);
+    }
+    if (Array.isArray(node.keywords) && node.keywords.length > 0) {
+      const kwBox = document.createElement('div');
+      kwBox.className = 'graph-evidence-tokens';
+      kwBox.style.margin = '0.4rem 0 0.8rem';
+      node.keywords.forEach(kw => {
+        const token = document.createElement('span');
+        token.className = 'graph-token';
+        token.textContent = kw;
+        kwBox.append(token);
+      });
+      details.append(kwBox);
+    }
+    if (node.description) {
+      const descP = document.createElement('p');
+      descP.className = 'graph-node-meta-desc';
+      descP.innerHTML = `<strong>Resumo metodológico:</strong> ${node.description.slice(0, 320)}${node.description.length > 320 ? '…' : ''}`;
+      details.append(descP);
     }
 
     const subtitle = document.createElement('p');
@@ -801,7 +888,13 @@ $('#run-graph-analysis').addEventListener('click', async (event) => {
         documents: lastSearchResults.map(r => ({
           id: r.external_id || r.id,
           title: r.title,
-          uri: r.canonical_uri || r.uri
+          uri: r.canonical_uri || r.uri,
+          description: r.description || '',
+          keywords: r.keywords || [],
+          authors: r.authors || [],
+          subjects: r.subjects || [],
+          collection: r.collection || '',
+          restricted_files: r.restricted_files || 0
         }))
       });
     } else if (scopeType === 'filter') {

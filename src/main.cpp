@@ -286,28 +286,37 @@ Response response_for(const std::string_view request) {
                 receipt.total_available = discovery.total_available;
                 receipt.references = std::move(discovery.references);
             }
-            std::string items = "[";
-            for (std::size_t index = 0; index < receipt.references.size(); ++index) {
-                const auto& reference = receipt.references[index];
-                if (index != 0) items += ',';
-                items += "{\"external_id\":\"" + json_escape(reference.external_id) +
-                    "\",\"title\":\"" + json_escape(reference.title) +
-                    "\",\"canonical_uri\":\"" + json_escape(reference.canonical_uri) +
-                    "\",\"version\":\"" + json_escape(reference.version.value_or("")) + "\"}";
+            nlohmann::json items = nlohmann::json::array();
+            for (const auto& reference : receipt.references) {
+                items.push_back({
+                    {"external_id", reference.external_id},
+                    {"title", reference.title},
+                    {"canonical_uri", reference.canonical_uri},
+                    {"version", reference.version.value_or("")},
+                    {"description", reference.description.value_or("")},
+                    {"keywords", reference.keywords},
+                    {"authors", reference.authors},
+                    {"subjects", reference.subjects},
+                    {"collection", reference.collection_name.value_or("")},
+                    {"restricted_files", reference.restricted_files}
+                });
             }
-            items += ']';
-            return {200, "OK", "application/json",
-                    "{\"provider_id\":\"redape\",\"persisted\":" +
-                        std::string(persist ? "true" : "false") + ",\"discovered\":" +
-                        std::to_string(receipt.discovered) + ",\"cataloged\":" +
-                        std::to_string(receipt.cataloged) + ",\"total_available\":" +
-                        std::to_string(receipt.total_available) + ",\"items\":" + items + "}", {}};
+            nlohmann::json resp{
+                {"provider_id", "redape"},
+                {"persisted", persist},
+                {"discovered", receipt.discovered},
+                {"cataloged", receipt.cataloged},
+                {"total_available", receipt.total_available},
+                {"items", std::move(items)}
+            };
+            return {200, "OK", "application/json", resp.dump(), {}};
         } catch (const std::exception& error) {
             std::cerr << "[NEXO REDAPE] " << error.what() << '\n';
             return {502, "Bad Gateway", "application/json",
                     R"({"error":{"code":"redape_unavailable","message":"Não foi possível consultar o REDAPE"}})", {}};
         }
     }
+
     if (request.starts_with("POST /api/v1/analysis/graph ")) {
         try {
             const auto user = nexo::auth::authenticate(database_url(), session_cookie(request));
@@ -329,10 +338,31 @@ Response response_for(const std::string_view request) {
                         if (parsed.contains("documents") && parsed["documents"].is_array()) {
                             for (const auto& item : parsed["documents"]) {
                                 if (item.is_object()) {
+                                    std::vector<std::string> kw_list;
+                                    if (item.contains("keywords") && item["keywords"].is_array()) {
+                                        for (const auto& k : item["keywords"])
+                                            if (k.is_string()) kw_list.push_back(k.get<std::string>());
+                                    }
+                                    std::vector<std::string> auth_list;
+                                    if (item.contains("authors") && item["authors"].is_array()) {
+                                        for (const auto& a : item["authors"])
+                                            if (a.is_string()) auth_list.push_back(a.get<std::string>());
+                                    }
+                                    std::vector<std::string> subj_list;
+                                    if (item.contains("subjects") && item["subjects"].is_array()) {
+                                        for (const auto& s : item["subjects"])
+                                            if (s.is_string()) subj_list.push_back(s.get<std::string>());
+                                    }
                                     transient_docs.push_back({
-                                        item.value("id", ""),
-                                        item.value("title", ""),
-                                        item.value("uri", "")
+                                        .id = item.value("id", ""),
+                                        .title = item.value("title", ""),
+                                        .uri = item.value("uri", ""),
+                                        .description = item.value("description", ""),
+                                        .keywords = std::move(kw_list),
+                                        .authors = std::move(auth_list),
+                                        .subjects = std::move(subj_list),
+                                        .collection_name = item.value("collection", ""),
+                                        .restricted_files = item.value("restricted_files", 0)
                                     });
                                 }
                             }
