@@ -199,8 +199,17 @@ async function runRedapeQuery(persist) {
     }
     output.textContent = persist
       ? `${result.cataloged} referência(s) catalogada(s); ${result.total_available} disponível(is) no REDAPE.`
-      : `${references.length} de ${result.total_available} referência(s) recuperada(s). Nenhuma referência catalogada.`;
-    $('#redape-results').replaceChildren(...references.map(renderRedapeResult));
+      : (references.length > 0
+          ? `${references.length} de ${result.total_available} referência(s) recuperada(s). Nenhuma referência catalogada.`
+          : 'Nenhum conjunto de dados encontrado no REDAPE para estes termos.');
+    if (references.length > 0) {
+      $('#redape-results').replaceChildren(...references.map(renderRedapeResult));
+    } else {
+      const emptyItem = document.createElement('li');
+      emptyItem.className = 'nexo-result-empty';
+      emptyItem.textContent = 'Nenhum registro encontrado no REDAPE para a consulta informada. O repositório da Embrapa não possui conjuntos de dados com esta expressão exata.';
+      $('#redape-results').replaceChildren(emptyItem);
+    }
   } catch (failure) {
     output.textContent = failure.message;
     $('#redape-results').replaceChildren();

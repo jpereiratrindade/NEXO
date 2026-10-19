@@ -78,6 +78,16 @@
 }
 .redape .nexo-result-card { scroll-behavior: auto; }
 }
+.redape-results .nexo-result-empty {
+  grid-column: 1 / -1;
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  color: #35506a;
+  background: #f4f8fc;
+  border: 1px dashed #9cb4c9;
+  font-size: .92rem;
+  line-height: 1.5;
+}
 
 /* NEXO-PATCH-003 / NEXO-PATCH-004: exploração científica do grafo */
 .graph-map[hidden] { display: none !important; }
