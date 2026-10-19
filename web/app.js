@@ -295,6 +295,49 @@ const graphElement = (tag, attrs = {}, text = '') => {
 let currentGraphAnalysis = null;
 let graphSelectionHandler = null;
 
+async function triggerGraphAnalysis(bodyPayload) {
+  const status = $('#graph-status');
+  status.textContent = 'Aprendendo estrutura do grafo…';
+  try {
+    const body = typeof bodyPayload === 'string' ? bodyPayload : JSON.stringify(bodyPayload);
+    const result = await authApi('/api/v1/analysis/graph', { method: 'POST', body });
+    const scopeNotice = result.scope ? ` [escopo: ${result.scope}]` : '';
+    status.textContent = `${result.input_count} referências${scopeNotice} · ${result.edge_count} relações · ${result.communities.length} comunidades. Padrões candidatos.`;
+    renderGraphNetwork(result);
+
+    const grid = $('#community-grid');
+    if (grid) {
+      grid.replaceChildren(...result.communities.map((community) => {
+        const card = document.createElement('article');
+        card.tabIndex = 0;
+        card.role = 'button';
+        card.setAttribute('aria-label', `Selecionar comunidade C${String(community.id).padStart(2, '0')}`);
+        const title = document.createElement('strong');
+        title.textContent = `C${String(community.id).padStart(2, '0')} · ${community.size} referência(s)`;
+        const terms = document.createElement('p');
+        terms.textContent = community.terms.join(' · ') || 'sem termos distintivos';
+        card.append(title, terms);
+        card.onclick = () => {
+          if (graphSelectionHandler) graphSelectionHandler.selectCommunity(community.id);
+        };
+        card.onkeydown = (e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            if (graphSelectionHandler) graphSelectionHandler.selectCommunity(community.id);
+          }
+        };
+        return card;
+      }));
+    }
+    return result;
+  } catch (failure) {
+    status.textContent = failure.message;
+    $('#graph-map').hidden = true;
+    $('#community-grid')?.replaceChildren();
+    throw failure;
+  }
+}
+
 function renderGraphNetwork(analysis) {
   currentGraphAnalysis = analysis;
   const container = $('#graph-map');
@@ -343,7 +386,16 @@ function renderGraphNetwork(analysis) {
   const layerAreas = graphElement('g', { class: 'layer-areas' });
   const layerEdges = graphElement('g', { class: 'layer-edges' });
   const layerNodes = graphElement('g', { class: 'layer-nodes' });
+  const layerSelection = graphElement('g', { class: 'layer-selection' });
+  const selectionBox = graphElement('rect', {
+    class: 'graph-selection-box',
+    x: 0, y: 0, width: 0, height: 0,
+    style: 'display: none;'
+  });
+  layerSelection.append(selectionBox);
   const accents = ['#008da3', '#b96519', '#426d9b', '#52786a', '#8166a2', '#a75063'];
+
+  let dragJustEnded = false;
 
   // Toolbar community chips
   if (filterChips) {
@@ -361,7 +413,7 @@ function renderGraphNetwork(analysis) {
       chip.dataset.community = key;
       chip.textContent = `C${key}`;
       chip.title = `Comunidade C${key} (${groups.get(key).length} referências)`;
-      chip.onclick = () => selectCommunity(key);
+      chip.onclick = () => { if (dragJustEnded) return; selectCommunity(key); };
       filterChips.append(chip);
     });
   }
@@ -378,7 +430,7 @@ function renderGraphNetwork(analysis) {
       'data-community': key, role: 'button', tabindex: 0,
       'aria-label': `Comunidade C${key} com ${members.length} referências`
     });
-    zone.onclick = () => selectCommunity(key);
+    zone.onclick = () => { if (dragJustEnded) return; selectCommunity(key); };
     zone.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectCommunity(key); } };
     layerAreas.append(zone);
 
@@ -386,7 +438,7 @@ function renderGraphNetwork(analysis) {
       x: cx, y: cy - radius - 8, 'text-anchor': 'middle', class: 'graph-community-label',
       'data-community': key, role: 'button', tabindex: 0
     }, `C${key} · ${members.length}`);
-    label.onclick = () => selectCommunity(key);
+    label.onclick = () => { if (dragJustEnded) return; selectCommunity(key); };
     layerAreas.append(label);
 
     members.forEach((node, memberIndex) => {
@@ -428,7 +480,7 @@ function renderGraphNetwork(analysis) {
     });
     line.append(graphElement('title', {},
       `${sNode?.title || sId} ↔ ${tNode?.title || tId}\nSimilaridade: ${Number(edge.weight).toFixed(2)}\nTermos compartilhados: ${evidenceStr}`));
-    line.onclick = () => selectEdge(edge);
+    line.onclick = () => { if (dragJustEnded) return; selectEdge(edge); };
     line.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectEdge(edge); } };
     layerEdges.append(line);
     edgeElements.push({ element: line, edge, sId, tId });
@@ -446,7 +498,7 @@ function renderGraphNetwork(analysis) {
       'aria-label': `Inspecionar ${node.title || id}`
     });
     point.append(graphElement('title', {}, node.title || id));
-    point.onclick = () => selectNode(id);
+    point.onclick = () => { if (dragJustEnded) return; selectNode(id); };
     point.onkeydown = (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -457,9 +509,102 @@ function renderGraphNetwork(analysis) {
     nodeElements.set(id, point);
   });
 
-  svg.append(layerAreas, layerEdges, layerNodes);
+  svg.append(layerAreas, layerEdges, layerNodes, layerSelection);
   canvas.append(svg);
   container.hidden = false;
+
+  function getSvgPoint(e) {
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const ctm = svg.getScreenCTM();
+    if (ctm) {
+      return pt.matrixTransform(ctm.inverse());
+    }
+    const rect = svg.getBoundingClientRect();
+    return {
+      x: (e.clientX - rect.left) * (width / rect.width),
+      y: (e.clientY - rect.top) * (height / rect.height)
+    };
+  }
+
+  let isPointerDown = false;
+  let didDrag = false;
+  let startX = 0;
+  let startY = 0;
+  let activeCandidates = new Set();
+
+  function onMouseMove(e) {
+    if (!isPointerDown) return;
+    const pt = getSvgPoint(e);
+    const dx = Math.abs(pt.x - startX);
+    const dy = Math.abs(pt.y - startY);
+    if (!didDrag && (dx > 4 || dy > 4)) {
+      didDrag = true;
+    }
+    if (!didDrag) return;
+
+    e.preventDefault();
+    const minX = Math.min(startX, pt.x);
+    const minY = Math.min(startY, pt.y);
+    const boxW = Math.abs(pt.x - startX);
+    const boxH = Math.abs(pt.y - startY);
+
+    selectionBox.setAttribute('x', minX);
+    selectionBox.setAttribute('y', minY);
+    selectionBox.setAttribute('width', boxW);
+    selectionBox.setAttribute('height', boxH);
+    selectionBox.style.display = 'block';
+
+    const currentInside = new Set();
+    positions.forEach((pos, id) => {
+      if (pos.x >= minX && pos.x <= minX + boxW && pos.y >= minY && pos.y <= minY + boxH) {
+        currentInside.add(id);
+      }
+    });
+
+    activeCandidates = currentInside;
+    nodeElements.forEach((el, id) => {
+      el.classList.toggle('is-drag-candidate', activeCandidates.has(id));
+    });
+  }
+
+  function onMouseUp(e) {
+    if (!isPointerDown) return;
+    isPointerDown = false;
+    window.removeEventListener('mousemove', onMouseMove);
+    window.removeEventListener('mouseup', onMouseUp);
+
+    selectionBox.style.display = 'none';
+    nodeElements.forEach(el => el.classList.remove('is-drag-candidate'));
+
+    if (didDrag) {
+      dragJustEnded = true;
+      setTimeout(() => { dragJustEnded = false; }, 80);
+
+      if (activeCandidates.size > 0) {
+        selectMultipleNodes([...activeCandidates]);
+      } else {
+        clearSelection();
+      }
+    } else {
+      if (e.target === svg || e.target.classList?.contains('layer-areas')) {
+        clearSelection();
+      }
+    }
+  }
+
+  svg.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    isPointerDown = true;
+    didDrag = false;
+    const pt = getSvgPoint(e);
+    startX = pt.x;
+    startY = pt.y;
+    activeCandidates.clear();
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  });
 
   function clearSelection() {
     svg.querySelectorAll('.is-selected, .is-neighbor, .is-dimmed, .is-community-selected, .is-active-edge, .is-hidden-edge')
@@ -470,7 +615,7 @@ function renderGraphNetwork(analysis) {
     }
     details.replaceChildren();
     const prompt = document.createElement('p');
-    prompt.textContent = 'Selecione um nó, aresta ou comunidade para explorar sua estrutura, pontes e evidências lexicais.';
+    prompt.textContent = 'Arraste com o mouse sobre o grafo para selecionar referências em lote, ou selecione nós, arestas e comunidades.';
     details.append(prompt);
   }
 
@@ -855,7 +1000,177 @@ function renderGraphNetwork(analysis) {
     }
   }
 
-  graphSelectionHandler = { selectCommunity, selectNode, selectEdge, clearSelection };
+  function selectMultipleNodes(selectedIds) {
+    clearSelection();
+    if (selectedIds.length === 1) {
+      selectNode(selectedIds[0]);
+      return;
+    }
+
+    const selSet = new Set(selectedIds.map(String));
+    nodeElements.forEach((el, id) => {
+      if (selSet.has(id)) el.classList.add('is-selected');
+      else el.classList.add('is-dimmed');
+    });
+
+    const commCounts = new Map();
+    for (const id of selectedIds) {
+      const node = nodeById.get(id);
+      if (node) {
+        const cKey = String(node.community);
+        commCounts.set(cKey, (commCounts.get(cKey) || 0) + 1);
+      }
+    }
+
+    svg.querySelectorAll('.graph-community-zone').forEach(z => {
+      if (commCounts.has(z.dataset.community)) z.classList.add('is-community-selected');
+      else z.classList.add('is-dimmed');
+    });
+    svg.querySelectorAll('.graph-community-label').forEach(l => {
+      if (!commCounts.has(l.dataset.community)) l.classList.add('is-dimmed');
+    });
+
+    edgeElements.forEach(({ element, sId, tId }) => {
+      const sIn = selSet.has(sId);
+      const tIn = selSet.has(tId);
+      if (sIn && tIn) {
+        element.classList.add('is-active-edge');
+      } else if (sIn || tIn) {
+        // bridge connecting to outer node
+      } else {
+        element.classList.add('is-hidden-edge');
+      }
+    });
+
+    details.replaceChildren();
+    const head = document.createElement('div');
+    head.className = 'graph-details-header';
+    const title = document.createElement('strong');
+    title.textContent = `Seleção por arrasto · ${selectedIds.length} referências selecionadas`;
+
+    const actions = document.createElement('div');
+    actions.className = 'graph-details-actions';
+
+    const focusBtn = document.createElement('button');
+    focusBtn.className = 'graph-focus-subset-btn';
+    focusBtn.type = 'button';
+    focusBtn.textContent = '🔬 Focar subconjunto no Grafo';
+    focusBtn.title = 'Recalcula o grafo restringindo o escopo a este subconjunto';
+    focusBtn.onclick = async () => {
+      focusBtn.disabled = true;
+      focusBtn.textContent = 'Calculando…';
+      try {
+        await triggerGraphAnalysis({ reference_ids: selectedIds });
+      } catch (err) {
+        alert('Erro ao calcular subconjunto: ' + err.message);
+      } finally {
+        focusBtn.disabled = false;
+      }
+    };
+
+    const clearBtn = document.createElement('button');
+    clearBtn.className = 'graph-details-clear';
+    clearBtn.type = 'button';
+    clearBtn.textContent = 'Limpar seleção';
+    clearBtn.onclick = clearSelection;
+
+    actions.append(focusBtn, clearBtn);
+    head.append(title, actions);
+    details.append(head);
+
+    const badges = document.createElement('div');
+    badges.className = 'graph-details-badges';
+    const commLabel = document.createElement('span');
+    commLabel.textContent = 'Comunidades abrangidas: ';
+    badges.append(commLabel);
+
+    [...commCounts.entries()].sort((a, b) => b[1] - a[1]).forEach(([cKey, count]) => {
+      const chip = document.createElement('button');
+      chip.className = 'graph-badge community-tag';
+      chip.type = 'button';
+      chip.textContent = `C${cKey} (${count})`;
+      chip.title = `Filtrar apenas pela comunidade C${cKey}`;
+      chip.onclick = () => selectCommunity(cKey);
+      badges.append(chip);
+    });
+    details.append(badges);
+
+    const kwCounts = new Map();
+    selectedIds.forEach(id => {
+      const node = nodeById.get(id);
+      if (node && Array.isArray(node.keywords)) {
+        node.keywords.forEach(kw => {
+          const clean = kw.trim();
+          if (clean) kwCounts.set(clean, (kwCounts.get(clean) || 0) + 1);
+        });
+      }
+    });
+
+    if (kwCounts.size > 0) {
+      const kwBox = document.createElement('div');
+      kwBox.style.margin = '0.5rem 0';
+      const kwLabel = document.createElement('span');
+      kwLabel.style.fontSize = '0.78rem';
+      kwLabel.style.fontWeight = 'bold';
+      kwLabel.textContent = 'Termos preponderantes no subconjunto: ';
+      kwBox.append(kwLabel);
+
+      const topTerms = [...kwCounts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+      topTerms.forEach(([term, cnt]) => {
+        const span = document.createElement('span');
+        span.className = 'graph-token';
+        span.textContent = cnt > 1 ? `${term} (${cnt})` : term;
+        kwBox.append(span);
+      });
+      details.append(kwBox);
+    }
+
+    const sub = document.createElement('p');
+    sub.innerHTML = `<strong>Referências selecionadas (${selectedIds.length}):</strong>`;
+    details.append(sub);
+
+    const list = document.createElement('ul');
+    list.className = 'graph-evidence-list';
+    selectedIds.forEach(id => {
+      const member = nodeById.get(id);
+      if (!member) return;
+      const item = document.createElement('li');
+      item.className = 'graph-evidence-item';
+      const itemHead = document.createElement('div');
+      itemHead.className = 'graph-evidence-item-head';
+      const docTitle = document.createElement('span');
+      docTitle.textContent = member.title || member.id;
+      const inspectBtn = document.createElement('button');
+      inspectBtn.className = 'graph-chip';
+      inspectBtn.type = 'button';
+      inspectBtn.textContent = 'Inspecionar nó';
+      inspectBtn.onclick = () => selectNode(String(member.id));
+      itemHead.append(docTitle, inspectBtn);
+      item.append(itemHead);
+
+      const itemMeta = document.createElement('div');
+      itemMeta.className = 'graph-details-badges';
+      itemMeta.innerHTML = `<span class="graph-badge">C${member.community}</span> <span class="graph-badge">Grau ${member.degree}</span>` +
+        (Number(member.bridge_score) > 0 ? `<span class="graph-badge bridge">Ponte (${Number(member.bridge_score).toFixed(2)})</span>` : '') +
+        (member.restricted_files > 0 ? `<span class="graph-badge restricted">Restrito (${member.restricted_files})</span>` : '');
+      const uri = safeRedapeUrl(member.uri);
+      if (uri) {
+        const link = document.createElement('a');
+        link.href = uri;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = 'Abrir referência original ↗';
+        link.style.display = 'inline-block';
+        link.style.marginTop = '0.3rem';
+        itemMeta.append(link);
+      }
+      item.append(itemMeta);
+      list.append(item);
+    });
+    details.append(list);
+  }
+
+  graphSelectionHandler = { selectCommunity, selectNode, selectEdge, selectMultipleNodes, clearSelection };
   clearSelection();
 
   let zoom = 1;
@@ -872,19 +1187,17 @@ function renderGraphNetwork(analysis) {
 
 $('#run-graph-analysis').addEventListener('click', async (event) => {
   const button = event.currentTarget;
-  const status = $('#graph-status');
   button.disabled = true;
-  status.textContent = 'Aprendendo estrutura do grafo…';
 
   try {
     const scopeType = $('#graph-scope-select')?.value || 'catalog';
-    let body = '{}';
+    let bodyPayload = {};
 
     if (scopeType === 'search_active') {
       if (lastSearchResults.length < 2) {
         throw new Error('A pesquisa ativa possui menos de 2 referências para calcular relações.');
       }
-      body = JSON.stringify({
+      bodyPayload = {
         documents: lastSearchResults.map(r => ({
           id: r.external_id || r.id,
           title: r.title,
@@ -896,45 +1209,18 @@ $('#run-graph-analysis').addEventListener('click', async (event) => {
           collection: r.collection || '',
           restricted_files: r.restricted_files || 0
         }))
-      });
+      };
     } else if (scopeType === 'filter') {
       const query = $('#graph-scope-query')?.value.trim() || '';
       if (!query) {
         throw new Error('Informe um termo no campo de busca para filtrar o catálogo.');
       }
-      body = JSON.stringify({ query });
+      bodyPayload = { query };
     }
 
-    const result = await authApi('/api/v1/analysis/graph', { method: 'POST', body });
-    const scopeNotice = result.scope ? ` [escopo: ${result.scope}]` : '';
-    status.textContent = `${result.input_count} referências${scopeNotice} · ${result.edge_count} relações · ${result.communities.length} comunidades. Padrões candidatos.`;
-    renderGraphNetwork(result);
-
-    $('#community-grid').replaceChildren(...result.communities.map((community) => {
-      const card = document.createElement('article');
-      card.tabIndex = 0;
-      card.role = 'button';
-      card.setAttribute('aria-label', `Selecionar comunidade C${String(community.id).padStart(2, '0')}`);
-      const title = document.createElement('strong');
-      title.textContent = `C${String(community.id).padStart(2, '0')} · ${community.size} referência(s)`;
-      const terms = document.createElement('p');
-      terms.textContent = community.terms.join(' · ') || 'sem termos distintivos';
-      card.append(title, terms);
-      card.onclick = () => {
-        if (graphSelectionHandler) graphSelectionHandler.selectCommunity(community.id);
-      };
-      card.onkeydown = (e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          if (graphSelectionHandler) graphSelectionHandler.selectCommunity(community.id);
-        }
-      };
-      return card;
-    }));
-  } catch (failure) {
-    status.textContent = failure.message;
-    $('#graph-map').hidden = true;
-    $('#community-grid').replaceChildren();
+    await triggerGraphAnalysis(bodyPayload);
+  } catch (err) {
+    $('#graph-status').textContent = err.message;
   } finally {
     button.disabled = false;
   }

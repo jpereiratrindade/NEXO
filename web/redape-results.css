@@ -122,17 +122,26 @@
 .graph-relationship.is-active-edge { stroke: #ca7017; stroke-opacity: .95; stroke-width: 3 !important; }
 .graph-relationship.is-hidden-edge { opacity: .05; pointer-events: none; }
 
+.graph-canvas svg { display: block; width: 100%; height: auto; max-height: 750px; min-height: 360px; user-select: none; cursor: crosshair; }
+
+.graph-selection-box { fill: rgba(0, 141, 163, 0.16); stroke: #008da3; stroke-width: 1.5; stroke-dasharray: 4 3; pointer-events: none; }
+
 .graph-reference-node { stroke: #fff; stroke-width: 2.5; cursor: pointer; transition: r .12s, opacity .15s; }
 .graph-reference-node:hover, .graph-reference-node:focus-visible { stroke: #021d48; stroke-width: 3.5; outline: none; r: 9; }
 .graph-reference-node.is-selected { stroke: #021d48; stroke-width: 4.5; r: 10; }
+.graph-reference-node.is-drag-candidate { stroke: #008da3; stroke-width: 4; r: 9.5; }
 .graph-reference-node.is-neighbor { stroke: #ca7017; stroke-width: 3.5; r: 8.5; }
 .graph-reference-node.is-dimmed { opacity: .15; }
 
 .graph-node-details { min-height: 6rem; padding: 1.2rem 1.4rem; border-top: 1px solid #cad9e6; font-size: .86rem; line-height: 1.55; overflow-wrap: anywhere; background: #fff; }
 .graph-details-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: .6rem; }
 .graph-details-header strong { font-size: 1.05rem; color: #021d48; }
+.graph-details-actions { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .graph-details-clear { padding: .35rem .75rem; font-size: .75rem; border: 1px solid #8ca6bd; background: #f4f8fc; color: #021d48; cursor: pointer; border-radius: 4px; font-weight: 700; white-space: nowrap; }
 .graph-details-clear:hover { background: #021d48; color: #fff; }
+.graph-focus-subset-btn { padding: .35rem .85rem; font-size: .75rem; border: 0; background: #008da3; color: #fff; cursor: pointer; border-radius: 4px; font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: .35rem; }
+.graph-focus-subset-btn:hover { background: #021d48; }
+.graph-focus-subset-btn:disabled { opacity: .6; cursor: wait; }
 .graph-details-badges { display: flex; flex-wrap: wrap; gap: .4rem; margin: .5rem 0; font-size: .74rem; }
 .graph-badge { padding: .2rem .5rem; border-radius: 4px; font-weight: 700; font-family: ui-monospace, monospace; background: #e3edf5; color: #021d48; }
 .graph-badge.bridge { background: #fee8d0; color: #8e3e00; border: 1px solid #f8bd84; }
