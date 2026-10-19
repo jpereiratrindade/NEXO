@@ -112,9 +112,21 @@
         <p>Descubra datasets publicados e catalogue identidade, versão e origem. Os dados científicos e a resposta do provedor não são incorporados ao NEXO.</p>
       </div>
       <form class="ingest-form" id="redape-ingest-form">
-        <label>Termo de busca<input name="query" maxlength="200" placeholder="Ex.: solos, genômica, carbono"></label>
+        <label>Busca geral<input name="query" maxlength="200" placeholder="Ex.: produção agroecológica"></label>
+        <details>
+          <summary>Pesquisa avançada</summary>
+          <div class="advanced-fields">
+            <label>Título<input name="title" maxlength="200"></label>
+            <label>Autor<input name="author" maxlength="200"></label>
+            <label>Descrição<input name="description" maxlength="200"></label>
+            <label>Palavra-chave<input name="keyword" maxlength="200"></label>
+            <label>Assunto<select name="subject"><option value="">Todos</option><option value="Agricultural Sciences">Ciências Agrárias</option><option value="Earth and Environmental Sciences">Ciências da Terra e Meio Ambiente</option><option value="Medicine, Health and Life Sciences">Medicina, Saúde e Ciências da Vida</option><option value="Social Sciences">Ciências Sociais</option><option value="Engineering">Engenharia</option><option value="Computer and Information Science">Computação e Ciência da Informação</option><option value="Other">Outros</option></select></label>
+            <label>Estado / província<input name="state" maxlength="100" placeholder="Ex.: Bahia"></label>
+          </div>
+        </details>
         <label>Quantidade<select name="limit"><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
         <button type="submit">Ingerir referências</button>
+        <a class="advanced-search" href="https://www.redape.dados.embrapa.br/dataverse/redape/search" target="_blank" rel="noopener noreferrer">Abrir pesquisa original no REDAPE ↗</a>
         <p id="redape-result" role="status">Somente metadados públicos publicados.</p>
       </form>
     </section>

@@ -21,5 +21,17 @@ int main() {
         std::cerr << "FAIL: normalização do resultado Dataverse REDAPE\n";
         return EXIT_FAILURE;
     }
+    const nexo::redape::SearchCriteria criteria{
+        .general = "produção agroecológica",
+        .title = "solo",
+        .author = "Pereira",
+        .subject = "Agricultural Sciences",
+        .state = "Bahia",
+    };
+    const auto query = nexo::redape::build_query(criteria);
+    if (query != "\"produção agroecológica\" AND title:\"solo\" AND authorName:\"Pereira\" AND subject:\"Agricultural Sciences\" AND state:\"Bahia\"") {
+        std::cerr << "FAIL: tradução dos critérios avançados\n";
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }

@@ -19,7 +19,9 @@ foreach(marker IN ITEMS
     "id=\"development-code\""
     "id=\"health-value\""
     "id=\"capability-list\""
-    "id=\"redape-ingest-form\"")
+    "id=\"redape-ingest-form\""
+    "Pesquisa avançada"
+    "https://www.redape.dados.embrapa.br/dataverse/redape/search")
   string(FIND "${html}" "${marker}" found)
   if(found EQUAL -1)
     message(FATAL_ERROR "PROBANTE: contrato de interface ausente: ${marker}")

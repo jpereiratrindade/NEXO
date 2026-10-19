@@ -238,21 +238,31 @@ Response response_for(const std::string_view request) {
             if (!nexo::auth::verify_csrf(*user, header_of(request, "X-CSRF-Token")))
                 return {403, "Forbidden", "application/json",
                         R"({"error":{"code":"csrf_failed","message":"Token CSRF inválido"}})", {}};
-            auto term = json_field(body_of(request), "query");
-            if (term.size() > 200)
+            nexo::redape::SearchCriteria criteria{
+                .general = json_field(body_of(request), "query"),
+                .title = json_field(body_of(request), "title"),
+                .author = json_field(body_of(request), "author"),
+                .description = json_field(body_of(request), "description"),
+                .keyword = json_field(body_of(request), "keyword"),
+                .subject = json_field(body_of(request), "subject"),
+                .state = json_field(body_of(request), "state"),
+            };
+            if (criteria.general.size() > 200 || criteria.title.size() > 200 ||
+                criteria.author.size() > 200 || criteria.description.size() > 200 ||
+                criteria.keyword.size() > 200 || criteria.subject.size() > 100 ||
+                criteria.state.size() > 100)
                 return {422, "Unprocessable Entity", "application/json",
-                        R"({"error":{"code":"invalid_query","message":"Consulta excede 200 caracteres"}})", {}};
-            std::size_t limit = 10;
+                        R"({"error":{"code":"invalid_query","message":"Critério de pesquisa excede o limite"}})", {}};
             const auto requested_limit = json_field(body_of(request), "limit");
             if (!requested_limit.empty()) {
                 const auto parsed = std::from_chars(requested_limit.data(),
-                                                     requested_limit.data() + requested_limit.size(), limit);
+                                                     requested_limit.data() + requested_limit.size(), criteria.limit);
                 if (parsed.ec != std::errc{} || parsed.ptr != requested_limit.data() + requested_limit.size() ||
-                    limit < 1 || limit > 100)
+                    criteria.limit < 1 || criteria.limit > 100)
                     return {422, "Unprocessable Entity", "application/json",
                             R"({"error":{"code":"invalid_limit","message":"Limite deve estar entre 1 e 100"}})", {}};
             }
-            const auto receipt = nexo::redape::ingest(database_url(), term, limit);
+            const auto receipt = nexo::redape::ingest(database_url(), criteria);
             return {200, "OK", "application/json",
                     "{\"provider_id\":\"redape\",\"discovered\":" +
                         std::to_string(receipt.discovered) + ",\"cataloged\":" +

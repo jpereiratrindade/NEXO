@@ -59,6 +59,18 @@ std::string version_of(const nlohmann::json& item) {
     return std::to_string(major) + "." + std::to_string(minor);
 }
 
+std::string solr_phrase(const std::string_view value) {
+    std::string escaped_value;
+    escaped_value.reserve(value.size() + 2);
+    escaped_value.push_back('"');
+    for (const char character : value) {
+        if (character == '\\' || character == '"') escaped_value.push_back('\\');
+        escaped_value.push_back(character);
+    }
+    escaped_value.push_back('"');
+    return escaped_value;
+}
+
 }  // namespace
 
 Discovery parse_search_response(const std::string_view response) {
@@ -93,13 +105,32 @@ Discovery parse_search_response(const std::string_view response) {
     return discovery;
 }
 
-Discovery discover(const std::string_view query_text, const std::size_t requested_limit) {
-    const auto limit = std::clamp(requested_limit, std::size_t{1}, std::size_t{100});
+std::string build_query(const SearchCriteria& criteria) {
+    std::vector<std::string> clauses;
+    const auto add = [&clauses](const std::string_view field, const std::string& value) {
+        if (!value.empty()) clauses.push_back(std::string(field) + ":" + solr_phrase(value));
+    };
+    if (!criteria.general.empty()) clauses.push_back(solr_phrase(criteria.general));
+    add("title", criteria.title);
+    add("authorName", criteria.author);
+    add("dsDescriptionValue", criteria.description);
+    add("keywordValue", criteria.keyword);
+    add("subject", criteria.subject);
+    add("state", criteria.state);
+    if (clauses.empty()) return "*";
+    std::string query_text = clauses.front();
+    for (std::size_t index = 1; index < clauses.size(); ++index)
+        query_text += " AND " + clauses[index];
+    return query_text;
+}
+
+Discovery discover(const SearchCriteria& criteria) {
+    const auto limit = std::clamp(criteria.limit, std::size_t{1}, std::size_t{100});
     std::unique_ptr<CURL, decltype(&curl_easy_cleanup)> curl(curl_easy_init(), &curl_easy_cleanup);
     if (!curl) throw std::runtime_error("cliente HTTP indisponível");
-    const auto term = query_text.empty() ? std::string{"*"} : std::string{query_text};
+    const auto term = build_query(criteria);
     const auto url = std::string(search_endpoint) + "?q=" + escaped(curl.get(), term) +
-        "&type=dataset&fq=publicationStatus%3APublished&sort=date&order=desc&per_page=" +
+        "&type=dataset&subtree=redape&fq=publicationStatus%3APublished&sort=date&order=desc&per_page=" +
         std::to_string(limit);
     std::string response;
     curl_easy_setopt(curl.get(), CURLOPT_URL, url.c_str());
@@ -107,6 +138,7 @@ Discovery discover(const std::string_view query_text, const std::size_t requeste
     curl_easy_setopt(curl.get(), CURLOPT_WRITEFUNCTION, receive);
     curl_easy_setopt(curl.get(), CURLOPT_WRITEDATA, &response);
     curl_easy_setopt(curl.get(), CURLOPT_PROTOCOLS_STR, "https");
+    curl_easy_setopt(curl.get(), CURLOPT_NOPROXY, "www.redape.dados.embrapa.br");
     curl_easy_setopt(curl.get(), CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl.get(), CURLOPT_MAXREDIRS, 3L);
     curl_easy_setopt(curl.get(), CURLOPT_CONNECTTIMEOUT, 5L);
@@ -119,9 +151,8 @@ Discovery discover(const std::string_view query_text, const std::size_t requeste
     return parse_search_response(response);
 }
 
-IngestReceipt ingest(const std::string_view connection, const std::string_view query_text,
-                     const std::size_t limit) {
-    auto discovery = discover(query_text, limit);
+IngestReceipt ingest(const std::string_view connection, const SearchCriteria& criteria) {
+    auto discovery = discover(criteria);
     auto db = connect(connection);
     query(db.get(), "BEGIN");
     std::size_t cataloged = 0;
@@ -131,7 +162,10 @@ IngestReceipt ingest(const std::string_view connection, const std::string_view q
                 "INSERT INTO nexo_external_references(provider_id,external_id,title,canonical_uri,version,observed_at,access_class) VALUES('redape',$1,$2,$3,NULLIF($4,''),$5::timestamptz,'public') ON CONFLICT (provider_id,external_id,version) DO UPDATE SET title=excluded.title,canonical_uri=excluded.canonical_uri,observed_at=excluded.observed_at,access_class='public' RETURNING reference_id::text",
                 {reference.external_id, reference.title, reference.canonical_uri,
                  reference.version.value_or(""), reference.observed_at});
-            const nlohmann::json scope{{"query", std::string(query_text)}, {"limit", limit}};
+            const nlohmann::json scope{{"query", criteria.general}, {"title", criteria.title},
+                                       {"author", criteria.author}, {"description", criteria.description},
+                                       {"keyword", criteria.keyword}, {"subject", criteria.subject},
+                                       {"state", criteria.state}, {"limit", criteria.limit}};
             const nlohmann::json receipt{{"source", std::string(search_endpoint)},
                                          {"total_available", discovery.total_available}};
             query(db.get(),
