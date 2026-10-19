@@ -3,12 +3,19 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include "nexo/auth.hpp"
+
 #include <array>
 #include <charconv>
+#include <chrono>
 #include <cstdlib>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
+#include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 
 namespace {
 
@@ -19,11 +26,159 @@ constexpr std::string_view readiness =
 constexpr std::string_view capabilities =
     R"({"schema":"nexo.capabilities/1.0.0","capabilities":[{"id":"external-reference.validate","version":"1.0.0"}]})";
 
-std::string_view response_for(const std::string_view request) {
-    if (request.starts_with("GET /api/health ")) return health;
-    if (request.starts_with("GET /api/readiness ")) return readiness;
-    if (request.starts_with("GET /api/capabilities ")) return capabilities;
-    return R"({"error":"not_found"})";
+struct Response {
+    int status;
+    std::string_view status_text;
+    std::string content_type;
+    std::string body;
+    std::string headers;
+};
+
+std::string_view body_of(const std::string_view request) {
+    const auto separator = request.find("\r\n\r\n");
+    return separator == std::string_view::npos ? std::string_view{} : request.substr(separator + 4);
+}
+
+std::string header_of(const std::string_view request, const std::string_view name) {
+    const auto marker = "\r\n" + std::string(name) + ": ";
+    const auto start = request.find(marker);
+    if (start == std::string_view::npos) return {};
+    const auto value_start = start + marker.size();
+    const auto end = request.find("\r\n", value_start);
+    return std::string(request.substr(value_start, end - value_start));
+}
+
+std::string json_field(const std::string_view json, const std::string_view field) {
+    const auto marker = "\"" + std::string(field) + "\"";
+    auto position = json.find(marker);
+    if (position == std::string_view::npos) return {};
+    position = json.find(':', position + marker.size());
+    if (position == std::string_view::npos) return {};
+    position = json.find('"', position + 1);
+    if (position == std::string_view::npos) return {};
+    std::string value;
+    for (++position; position < json.size(); ++position) {
+        if (json[position] == '"') break;
+        if (json[position] == '\\' && position + 1 < json.size()) ++position;
+        value.push_back(json[position]);
+    }
+    return value;
+}
+
+std::string json_escape(const std::string_view value) {
+    std::string escaped;
+    for (const char character : value) {
+        if (character == '"' || character == '\\') escaped.push_back('\\');
+        if (character != '\n' && character != '\r') escaped.push_back(character);
+    }
+    return escaped;
+}
+
+std::string session_cookie(const std::string_view request) {
+    const auto cookies = header_of(request, "Cookie");
+    constexpr std::string_view name = "nexo_session=";
+    const auto start = cookies.find(name);
+    if (start == std::string::npos) return {};
+    const auto value_start = start + name.size();
+    const auto end = cookies.find(';', value_start);
+    return cookies.substr(value_start, end - value_start);
+}
+
+std::string database_url() {
+    const char* value = std::getenv("NEXO_DATABASE_URL");
+    return value == nullptr ? std::string{} : std::string(value);
+}
+
+std::string load_asset(const std::string_view filename) {
+    const auto path = std::filesystem::path(NEXO_WEB_ROOT) / filename;
+    std::ifstream stream(path, std::ios::binary);
+    if (!stream) return {};
+    std::ostringstream contents;
+    contents << stream.rdbuf();
+    return contents.str();
+}
+
+Response response_for(const std::string_view request) {
+    if (request.starts_with("GET /api/health "))
+        return {200, "OK", "application/json", std::string(health), {}};
+    if (request.starts_with("GET /api/readiness "))
+        return {200, "OK", "application/json", std::string(readiness), {}};
+    if (request.starts_with("GET /api/capabilities "))
+        return {200, "OK", "application/json", std::string(capabilities), {}};
+
+    if (request.starts_with("POST /api/v1/auth/login ")) {
+        try {
+            const auto connection = database_url();
+            if (connection.empty())
+                return {503, "Service Unavailable", "application/json",
+                        R"({"error":{"code":"database_not_configured","message":"NEXO_DATABASE_URL ausente"}})", {}};
+            const auto login_name = json_field(body_of(request), "login");
+            const auto password = json_field(body_of(request), "password");
+            const auto result = nexo::auth::login(connection, login_name, password);
+            if (!result) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(150));
+                return {401, "Unauthorized", "application/json",
+                        R"({"error":{"code":"invalid_credentials","message":"Credenciais inválidas"}})", {}};
+            }
+            const auto body = "{\"user\":{\"id\":\"" + json_escape(result->user.id) +
+                "\",\"login\":\"" + json_escape(result->user.login) +
+                "\",\"display_name\":\"" + json_escape(result->user.display_name) +
+                "\",\"role\":\"" + json_escape(result->user.role) +
+                "\"},\"csrf_token\":\"" + result->csrf_token + "\"}";
+            return {200, "OK", "application/json", body,
+                    "Set-Cookie: nexo_session=" + result->session_token +
+                        "; Path=/; HttpOnly; SameSite=Strict\r\n"};
+        } catch (const std::exception&) {
+            return {503, "Service Unavailable", "application/json",
+                    R"({"error":{"code":"auth_unavailable","message":"Autenticação indisponível"}})", {}};
+        }
+    }
+    if (request.starts_with("GET /api/v1/auth/me ")) {
+        try {
+            const auto user = nexo::auth::authenticate(database_url(), session_cookie(request));
+            if (!user) return {401, "Unauthorized", "application/json",
+                               R"({"error":{"code":"unauthenticated","message":"Autenticação necessária"}})", {}};
+            return {200, "OK", "application/json",
+                    "{\"user\":{\"id\":\"" + json_escape(user->id) + "\",\"login\":\"" +
+                        json_escape(user->login) + "\",\"display_name\":\"" +
+                        json_escape(user->display_name) + "\",\"role\":\"" +
+                        json_escape(user->role) + "\"}}", {}};
+        } catch (const std::exception&) {
+            return {503, "Service Unavailable", "application/json",
+                    R"({"error":{"code":"auth_unavailable","message":"Autenticação indisponível"}})", {}};
+        }
+    }
+    if (request.starts_with("POST /api/v1/auth/logout ")) {
+        try {
+            if (!nexo::auth::logout(database_url(), session_cookie(request),
+                                    header_of(request, "X-CSRF-Token")))
+                return {403, "Forbidden", "application/json",
+                        R"({"error":{"code":"csrf_failed","message":"Token CSRF inválido"}})", {}};
+            return {200, "OK", "application/json", R"({"ok":true})",
+                    "Set-Cookie: nexo_session=; Path=/; Max-Age=0; HttpOnly; SameSite=Strict\r\n"};
+        } catch (const std::exception&) {
+            return {503, "Service Unavailable", "application/json",
+                    R"({"error":{"code":"auth_unavailable","message":"Autenticação indisponível"}})", {}};
+        }
+    }
+
+    std::string_view asset;
+    std::string_view type;
+    if (request.starts_with("GET / ") || request.starts_with("GET /index.html ")) {
+        asset = "index.html";
+        type = "text/html; charset=utf-8";
+    } else if (request.starts_with("GET /styles.css ")) {
+        asset = "styles.css";
+        type = "text/css; charset=utf-8";
+    } else if (request.starts_with("GET /app.js ")) {
+        asset = "app.js";
+        type = "text/javascript; charset=utf-8";
+    }
+    if (!asset.empty()) {
+        auto body = load_asset(asset);
+        if (!body.empty()) return {200, "OK", std::string(type), std::move(body), {}};
+    }
+    return {404, "Not Found", "application/json", R"({"error":"not_found"})", {}};
 }
 
 int parse_port(const int argc, char** argv) {
@@ -44,6 +199,29 @@ int parse_port(const int argc, char** argv) {
 }  // namespace
 
 int main(const int argc, char** argv) {
+    if (argc >= 2 && std::string_view(argv[1]) == "setup-admin") {
+        const auto connection = database_url();
+        if (connection.empty()) {
+            std::cerr << "NEXO_DATABASE_URL ausente\n";
+            return EXIT_FAILURE;
+        }
+        std::string login_name = "admin";
+        std::string display_name = "Administrador";
+        for (int index = 2; index + 1 < argc; index += 2) {
+            if (std::string_view(argv[index]) == "--login") login_name = argv[index + 1];
+            else if (std::string_view(argv[index]) == "--display-name") display_name = argv[index + 1];
+            else { std::cerr << "uso: nexo-server setup-admin [--login nome] [--display-name nome]\n"; return EXIT_FAILURE; }
+        }
+        const char* raw = ::getpass("Senha (mínimo 12 caracteres): ");
+        try {
+            nexo::auth::setup_admin(connection, login_name, display_name, raw == nullptr ? "" : raw);
+            std::cout << "Administrador criado.\n";
+            return EXIT_SUCCESS;
+        } catch (const std::exception& error) {
+            std::cerr << error.what() << '\n';
+            return EXIT_FAILURE;
+        }
+    }
     const int port = parse_port(argc, argv);
     if (port < 0) {
         std::cerr << "uso: nexo-server [--port 1024..65535]\n";
@@ -76,12 +254,14 @@ int main(const int argc, char** argv) {
         std::array<char, 8192> buffer{};
         const auto count = ::read(client, buffer.data(), buffer.size());
         const std::string_view request(buffer.data(), count > 0 ? static_cast<std::size_t>(count) : 0U);
-        const auto body = response_for(request);
-        const bool found = body != R"({"error":"not_found"})";
+        const auto response_data = response_for(request);
         const std::string response =
-            std::string(found ? "HTTP/1.1 200 OK\r\n" : "HTTP/1.1 404 Not Found\r\n") +
-            "Content-Type: application/json\r\nConnection: close\r\nContent-Length: " +
-            std::to_string(body.size()) + "\r\n\r\n" + std::string(body);
+            "HTTP/1.1 " + std::to_string(response_data.status) + " " +
+            std::string(response_data.status_text) + "\r\nContent-Type: " +
+            response_data.content_type +
+            "\r\n" + response_data.headers +
+            "X-Content-Type-Options: nosniff\r\nX-Frame-Options: SAMEORIGIN\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'self'; frame-ancestors 'self'\r\nCache-Control: no-store\r\nConnection: close\r\nContent-Length: " +
+            std::to_string(response_data.body.size()) + "\r\n\r\n" + response_data.body;
         (void)::write(client, response.data(), response.size());
         ::close(client);
     }

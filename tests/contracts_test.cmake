@@ -2,7 +2,8 @@ set(required_files
   "${ROOT}/contracts/external-reference.schema.json"
   "${ROOT}/contracts/connector-capabilities.schema.json"
   "${ROOT}/docs/adr/ADR-0001-federation-and-scientific-provenance.md"
-  "${ROOT}/storage/migrations/001_initial.sql")
+  "${ROOT}/storage/migrations/001_initial.sql"
+  "${ROOT}/storage/migrations/002_authentication.sql")
 
 foreach(file IN LISTS required_files)
   if(NOT EXISTS "${file}")

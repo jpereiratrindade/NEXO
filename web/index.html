@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="NEXO — federação e proveniência científica verificável.">
+  <title>NEXO — Sempre pronto. Sempre incompleto.</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body class="auth-locked">
+  <a class="skip-link" href="#conteudo">Ir para o conteúdo</a>
+  <main class="login" id="login-view" aria-labelledby="login-title">
+    <section class="login-story">
+      <div>
+        <div class="login-brand">
+          <svg class="brand-symbol" viewBox="0 0 64 64" aria-hidden="true"><g fill="none" stroke="currentColor" stroke-width="2.8"><path d="M32 5 55 18v28L32 59 9 46V18z"/><path d="M32 5v54M9 18l46 28M55 18 9 46"/></g><g fill="currentColor"><circle cx="32" cy="5" r="4"/><circle cx="55" cy="18" r="4"/><circle cx="55" cy="46" r="4"/><circle cx="32" cy="59" r="4"/><circle cx="9" cy="46" r="4"/><circle cx="9" cy="18" r="4"/><circle cx="32" cy="32" r="5"/></g></svg>
+          <span><small>Ecossistema SisTer</small><strong>NEXO</strong></span>
+        </div>
+        <p class="eyebrow">Federação e proveniência científica</p>
+        <h1 id="login-title">Conhecimento conectado.<br><em>Origem preservada.</em></h1>
+        <p>Articule informação distribuída sem apagar autoridade, contexto ou caminho científico.</p>
+      </div>
+      <div class="network-lines" aria-hidden="true"><i></i><i></i><i></i></div>
+    </section>
+    <section class="login-card">
+      <span class="login-kicker">Acesso ao sistema</span>
+      <h2>Boas-vindas</h2>
+      <p>Entre para acessar o ambiente PROBANTE.</p>
+      <form id="login-form">
+        <label>Usuário<input name="login" autocomplete="username" required></label>
+        <label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
+        <button type="submit">Entrar</button>
+        <p class="login-error" role="alert"></p>
+      </form>
+      <small>Sempre pronto. Sempre incompleto.</small>
+    </section>
+  </main>
+  <div id="authenticated-app">
+  <header class="topbar">
+    <a class="brand" href="#inicio" aria-label="NEXO no ecossistema SisTer, início">
+      <svg class="brand-symbol" viewBox="0 0 64 64" aria-hidden="true">
+        <g fill="none" stroke="currentColor" stroke-width="2.8"><path d="M32 5 55 18v28L32 59 9 46V18z"/><path d="M32 5v54M9 18l46 28M55 18 9 46"/></g>
+        <g fill="currentColor"><circle cx="32" cy="5" r="4"/><circle cx="55" cy="18" r="4"/><circle cx="55" cy="46" r="4"/><circle cx="32" cy="59" r="4"/><circle cx="9" cy="46" r="4"/><circle cx="9" cy="18" r="4"/><circle cx="32" cy="32" r="5"/></g>
+      </svg>
+      <span class="brand-text"><small>Ecossistema SisTer</small><strong>NEXO</strong></span>
+    </a>
+    <nav aria-label="Navegação principal">
+      <a href="#sistema">Sistema</a>
+      <a href="#fronteira">Fronteira</a>
+      <a href="#contratos">Contratos</a>
+    </nav>
+    <div class="top-context"><span class="context-pill">PROBANTE · testes</span><button class="logout" id="logout" type="button">Sair</button><div class="live-pill"><span class="pulse" aria-hidden="true"></span><span id="nav-status">verificando</span></div></div>
+  </header>
+
+  <main id="conteudo">
+    <section class="hero" id="inicio">
+      <div class="eyebrow"><span>01</span> Infraestrutura científica federada</div>
+      <h1>Conhecimento conectado.<br><em>Origem preservada.</em></h1>
+      <div class="hero-lower">
+        <p class="lede">O NEXO articula informação distribuída, executa transformações transitórias e registra como cada resultado foi produzido.</p>
+        <a class="cta" href="#sistema">Ver sistema <span aria-hidden="true">↓</span></a>
+      </div>
+      <div class="orbit" aria-hidden="true">
+        <span class="orbit-core">N</span>
+        <i class="node node-a"></i><i class="node node-b"></i><i class="node node-c"></i>
+      </div>
+    </section>
+
+    <section class="system" id="sistema" aria-labelledby="system-title">
+      <header class="section-heading">
+        <div><span class="kicker">Estado operacional</span><h2 id="system-title">O sistema, agora.</h2></div>
+        <time id="clock">--:--:-- BRT</time>
+      </header>
+      <div class="telemetry">
+        <article class="primary-signal">
+          <div class="signal-label">Núcleo</div>
+          <div class="signal-state"><span class="big-dot" id="health-dot"></span><strong id="health-value">Consultando</strong></div>
+          <p id="health-note">Estabelecendo contato com o servidor local.</p>
+          <dl>
+            <div><dt>Esquema</dt><dd id="health-schema">—</dd></div>
+            <div><dt>Completo</dt><dd id="complete-value">—</dd></div>
+          </dl>
+        </article>
+        <article class="capability-panel">
+          <div class="signal-label">Capacidades declaradas</div>
+          <ol id="capability-list"><li class="loading">Carregando contrato…</li></ol>
+        </article>
+        <article class="readiness-panel">
+          <div class="signal-label">Prontidão</div>
+          <div class="readiness-value" id="ready-value">—</div>
+          <p>Dependências essenciais disponíveis para este incremento.</p>
+          <div class="meter"><span id="ready-meter"></span></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="boundary" id="fronteira" aria-labelledby="boundary-title">
+      <div class="boundary-intro">
+        <span class="kicker">NEXO · participante federado SisTer</span>
+        <h2 id="boundary-title">Articular não é apropriar.</h2>
+        <p>O NEXO existe entre sistemas de autoridade. Ele mantém o fio verificável entre fonte, transformação e decisão — sem criar outro silo científico.</p>
+      </div>
+      <div class="flow" aria-label="Fluxo de informação no NEXO">
+        <article><span>01</span><h3>Referenciar</h3><p>Identidade, versão e autoridade permanecem explícitas.</p></article>
+        <div class="flow-line" aria-hidden="true">→</div>
+        <article><span>02</span><h3>Transformar</h3><p>Insumos externos existem apenas em área transitória governada.</p></article>
+        <div class="flow-line" aria-hidden="true">→</div>
+        <article><span>03</span><h3>Promover</h3><p>Cálculo só vira achado após decisão humana registrada.</p></article>
+      </div>
+    </section>
+
+    <section class="contracts" id="contratos" aria-labelledby="contracts-title">
+      <header class="section-heading light">
+        <div><span class="kicker">Contratos públicos</span><h2 id="contracts-title">Integração sem atalhos.</h2></div>
+        <p>Interfaces versionadas separam o domínio das particularidades de cada provedor.</p>
+      </header>
+      <div class="contract-grid">
+        <article>
+          <div class="contract-meta"><span>JSON Schema</span><b>1.0.0</b></div>
+          <h3>External Reference</h3>
+          <p>Uma referência verificável a um objeto mantido por seu sistema de autoridade.</p>
+          <code>nexo.external-reference/1.0.0</code>
+        </article>
+        <article>
+          <div class="contract-meta"><span>JSON Schema</span><b>1.0.0</b></div>
+          <h3>Connector Capabilities</h3>
+          <p>Operações e transportes que um conector declara de forma estável.</p>
+          <code>discover · describe · retrieve</code>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="brand footer-brand"><span class="nexo-node">N</span><span>NEXO <small>· SisTer</small></span></div>
+    <p>Sempre pronto. <em>Sempre incompleto.</em></p>
+    <span>Loopback only · C++26</span>
+  </footer>
+  </div>
+</body>
+</html>

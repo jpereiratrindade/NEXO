@@ -24,6 +24,8 @@ Este projeto é um MVP isolado. Não substitui `sister-nexo`.
 - migração PostgreSQL inicial;
 - servidor HTTP mínimo em `127.0.0.1`;
 - endpoints `/api/health`, `/api/readiness` e `/api/capabilities`;
+- interface web responsiva servida na raiz `/`;
+- autenticação PostgreSQL com PBKDF2, sessão opaca, CSRF e cookie HttpOnly;
 - testes do domínio e dos contratos.
 
 ## Build
@@ -34,11 +36,27 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+Todos os testes seguem o perfil **PROBANTE**: cada caso declara e verifica uma
+invariante observável do domínio, dos contratos ou da experiência web.
+
 ## Executar
 
 ```bash
 ./build/nexo-server --port 18115
 ```
+
+A interface estará disponível em `http://127.0.0.1:18115/`.
+
+Defina `NEXO_DATABASE_URL`, aplique as migrações e crie o primeiro administrador:
+
+```bash
+export NEXO_DATABASE_URL='postgresql://...'
+psql "$NEXO_DATABASE_URL" -f storage/migrations/001_initial.sql
+psql "$NEXO_DATABASE_URL" -f storage/migrations/002_authentication.sql
+./build/nexo-server setup-admin --login admin --display-name "Administrador"
+```
+
+A senha é solicitada no terminal e nunca aceita por argumento.
 
 Somente loopback é aceito. Persistência e conector GeoInfo entram nos próximos
 incrementos.
