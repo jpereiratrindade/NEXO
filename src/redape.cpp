@@ -93,6 +93,38 @@ std::string solr_terms(const std::string_view value) {
     return "(" + escaped_value + ")";
 }
 
+std::string extract_persistent_id(const std::string_view input) {
+    auto trimmed = input;
+    while (!trimmed.empty() && (trimmed.front() == ' ' || trimmed.front() == '\t')) trimmed.remove_prefix(1);
+    while (!trimmed.empty() && (trimmed.back() == ' ' || trimmed.back() == '\t')) trimmed.remove_suffix(1);
+
+    const auto pid_pos = trimmed.find("persistentId=");
+    if (pid_pos != std::string_view::npos) {
+        auto pid = trimmed.substr(pid_pos + 13);
+        const auto end_pos = pid.find_first_of("&# \t\r\n");
+        if (end_pos != std::string_view::npos) pid = pid.substr(0, end_pos);
+        if (!pid.empty()) return std::string(pid);
+    }
+
+    const auto doi_org = trimmed.find("doi.org/");
+    if (doi_org != std::string_view::npos) {
+        auto doi_val = trimmed.substr(doi_org + 8);
+        const auto end_pos = doi_val.find_first_of("?&# \t\r\n");
+        if (end_pos != std::string_view::npos) doi_val = doi_val.substr(0, end_pos);
+        if (!doi_val.empty()) return "doi:" + std::string(doi_val);
+    }
+
+    if (trimmed.starts_with("doi:")) {
+        return std::string(trimmed);
+    }
+
+    if (trimmed.starts_with("10.") && trimmed.find('/') != std::string_view::npos) {
+        return "doi:" + std::string(trimmed);
+    }
+
+    return {};
+}
+
 }  // namespace
 
 Discovery parse_search_response(const std::string_view response) {
@@ -132,7 +164,14 @@ std::string build_query(const SearchCriteria& criteria) {
     const auto add = [&clauses](const std::string_view field, const std::string& value) {
         if (!value.empty()) clauses.push_back(std::string(field) + ":" + solr_phrase(value));
     };
-    if (!criteria.general.empty()) clauses.push_back(solr_terms(criteria.general));
+    if (!criteria.general.empty()) {
+        const auto pid = extract_persistent_id(criteria.general);
+        if (!pid.empty()) {
+            clauses.push_back(solr_phrase(pid));
+        } else {
+            clauses.push_back(solr_terms(criteria.general));
+        }
+    }
     add("title", criteria.title);
     add("authorName", criteria.author);
     add("dsDescriptionValue", criteria.description);

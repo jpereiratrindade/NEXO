@@ -50,5 +50,17 @@ int main() {
         std::cerr << "FAIL: preservacao de operadores booleanos na busca geral\n";
         return EXIT_FAILURE;
     }
+    const nexo::redape::SearchCriteria doi_criteria{.general = "doi:10.48432/ABC123"};
+    if (nexo::redape::build_query(doi_criteria) != "\"doi:10.48432/ABC123\"") {
+        std::cerr << "FAIL: resolucao direta de DOI na busca geral\n";
+        return EXIT_FAILURE;
+    }
+    const nexo::redape::SearchCriteria url_criteria{
+        .general = "https://www.redape.dados.embrapa.br/dataset.xhtml?persistentId=doi:10.48432/ABC123&version=1.0"
+    };
+    if (nexo::redape::build_query(url_criteria) != "\"doi:10.48432/ABC123\"") {
+        std::cerr << "FAIL: extracao de persistentId de URL do Dataverse na busca geral\n";
+        return EXIT_FAILURE;
+    }
     return EXIT_SUCCESS;
 }
