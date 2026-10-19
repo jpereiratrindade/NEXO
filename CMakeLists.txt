@@ -24,8 +24,13 @@ target_include_directories(nexo_redape PUBLIC include)
 target_link_libraries(nexo_redape PRIVATE nexo_domain CURL::libcurl PostgreSQL::PostgreSQL nlohmann_json::nlohmann_json)
 target_compile_options(nexo_redape PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 
+add_library(nexo_graph src/graph.cpp)
+target_include_directories(nexo_graph PUBLIC include)
+target_link_libraries(nexo_graph PRIVATE PostgreSQL::PostgreSQL nlohmann_json::nlohmann_json)
+target_compile_options(nexo_graph PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
+
 add_executable(nexo-server src/main.cpp)
-target_link_libraries(nexo-server PRIVATE nexo_auth nexo_redape)
+target_link_libraries(nexo-server PRIVATE nexo_auth nexo_redape nexo_graph nlohmann_json::nlohmann_json)
 target_compile_options(nexo-server PRIVATE -Wall -Wextra -Wpedantic -Wconversion)
 target_compile_definitions(nexo-server PRIVATE NEXO_WEB_ROOT="${CMAKE_CURRENT_BINARY_DIR}/web")
 
@@ -48,6 +53,10 @@ if(BUILD_TESTING)
   add_executable(nexo_redape_tests tests/redape_tests.cpp)
   target_link_libraries(nexo_redape_tests PRIVATE nexo_redape)
   add_test(NAME probante_redape COMMAND nexo_redape_tests)
+
+  add_executable(nexo_graph_tests tests/graph_tests.cpp)
+  target_link_libraries(nexo_graph_tests PRIVATE nexo_graph)
+  add_test(NAME probante_graph COMMAND nexo_graph_tests)
 
   add_test(
     NAME probante_contracts

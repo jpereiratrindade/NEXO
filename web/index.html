@@ -6,6 +6,7 @@
   <meta name="description" content="NEXO — federação e proveniência científica verificável.">
   <title>NEXO — Sempre pronto. Sempre incompleto.</title>
   <link rel="stylesheet" href="/styles.css">
+  <link rel="stylesheet" href="/redape-results.css">
   <script src="/app.js" defer></script>
 </head>
 <body class="auth-locked">
@@ -108,8 +109,8 @@
     <section class="redape" id="redape" aria-labelledby="redape-title">
       <div class="redape-copy">
         <span class="kicker">Conector Dataverse · Embrapa</span>
-        <h2 id="redape-title">Ingerir referências do REDAPE.</h2>
-        <p>Descubra datasets publicados e catalogue identidade, versão e origem. Os dados científicos e a resposta do provedor não são incorporados ao NEXO.</p>
+        <h2 id="redape-title">Explorar referências do REDAPE.</h2>
+        <p>Pesquise conjuntos de dados publicados sem gravar. Catalogue referências somente quando decidir incluí-las no NEXO para análise.</p>
       </div>
       <form class="ingest-form" id="redape-ingest-form">
         <label>Busca geral<input name="query" maxlength="200" placeholder="Ex.: produção agroecológica"></label>
@@ -126,11 +127,55 @@
           </div>
         </details>
         <label>Quantidade<select name="limit"><option>10</option><option>25</option><option>50</option><option>100</option></select></label>
-        <button type="submit">Ingerir referências</button>
+        <button type="submit">Pesquisar (sem gravar)</button>
+        <button id="redape-catalog-button" class="secondary-button" type="button">Catalogar referências</button>
         <a class="advanced-search" href="https://www.redape.dados.embrapa.br/dataverse/redape/search" target="_blank" rel="noopener noreferrer">Abrir pesquisa original no REDAPE ↗</a>
-        <p id="redape-result" role="status">Somente metadados públicos publicados.</p>
+        <p id="redape-result" role="status">Pesquisa sem persistência; catalogação apenas por ação explícita.</p>
       </form>
+      <p class="nexo-results-guidance">Selecione “Ver detalhes” em cada cartão para inspecionar os metadados informados pela busca.</p>
       <ol class="redape-results" id="redape-results" aria-label="Referências encontradas"></ol>
+      <section class="graph-analysis" aria-labelledby="graph-title">
+        <div class="graph-intro">
+          <span class="kicker">Aprendizagem não supervisionada</span>
+          <h3 id="graph-title">Cartografia emergente</h3>
+          <p>O NEXO aprende relações sem taxonomia prévia. Permite explorar comunidades, interrogar nós e evidências, e restringir a análise aos resultados de uma pesquisa específica.</p>
+        </div>
+        <div class="graph-scope-bar">
+          <label for="graph-scope-select">Escopo da análise:</label>
+          <div class="graph-scope-inputs">
+            <select id="graph-scope-select">
+              <option value="catalog">Catálogo integral (todas as referências)</option>
+              <option value="search_active" disabled id="graph-scope-search-opt">Resultados da pesquisa REDAPE ativa (0)</option>
+              <option value="filter">Filtrar catálogo por termo</option>
+            </select>
+            <input type="text" id="graph-scope-query" placeholder="Termo no título (ex.: carbono, solo, castanha)…" hidden />
+            <button id="run-graph-analysis" type="button">Analisar grafo</button>
+          </div>
+        </div>
+        <p id="graph-status" role="status"></p>
+        <section id="graph-map" class="graph-map" aria-label="Rede gráfica de referências" hidden>
+          <div class="graph-map-toolbar">
+            <div>
+              <strong id="graph-map-title">Rede de similaridades entre referências</strong>
+              <p id="graph-map-subtitle">Ligações lexicais candidatas; selecione nós, arestas ou comunidades para examinar evidências científicas.</p>
+            </div>
+            <div class="graph-map-actions">
+              <div class="graph-community-filter" id="graph-community-filter" aria-label="Filtro rápido de comunidade"></div>
+              <div class="graph-zoom-controls" aria-label="Controles de ampliação">
+                <button type="button" id="graph-zoom-out" aria-label="Afastar">−</button>
+                <button type="button" id="graph-zoom-in" aria-label="Aproximar">+</button>
+                <button type="button" id="graph-zoom-reset">Recentrar</button>
+              </div>
+            </div>
+          </div>
+          <div id="graph-canvas" class="graph-canvas"></div>
+          <aside id="graph-node-details" class="graph-node-details" aria-live="polite"></aside>
+        </section>
+        <details class="graph-community-disclosure">
+          <summary>Comunidades detectadas — apresentação textual</summary>
+          <div class="community-grid" id="community-grid"></div>
+        </details>
+      </section>
     </section>
 
     <section class="boundary" id="fronteira" aria-labelledby="boundary-title">

@@ -21,6 +21,9 @@ foreach(marker IN ITEMS
     "id=\"capability-list\""
     "id=\"redape-ingest-form\""
     "id=\"redape-results\""
+    "id=\"redape-catalog-button\""
+    "id=\"run-graph-analysis\""
+    "id=\"graph-scope-select\""
     "Pesquisa avançada"
     "https://www.redape.dados.embrapa.br/dataverse/redape/search")
   string(FIND "${html}" "${marker}" found)
@@ -30,7 +33,21 @@ foreach(marker IN ITEMS
 endforeach()
 
 file(READ "${script}" javascript)
-foreach(endpoint IN ITEMS "/api/health" "/api/readiness" "/api/capabilities" "/api/v1/auth/request-code" "/api/v1/auth/verify-code" "/api/v1/auth/me" "/api/v1/auth/logout" "/api/v1/auth/csrf" "/api/v1/connectors/redape/ingest")
+set(redape_cards_css "${ROOT}/web/redape-results.css")
+if(NOT EXISTS "${redape_cards_css}")
+  message(FATAL_ERROR "PROBANTE: estilos dos resultados REDAPE ausentes")
+endif()
+string(FIND "${html}" "/redape-results.css" results_stylesheet)
+if(results_stylesheet EQUAL -1)
+  message(FATAL_ERROR "PROBANTE: estilos REDAPE não são carregados pela interface")
+endif()
+foreach(marker IN ITEMS "renderRedapeResult" "safeRedapeUrl" "document.createElement('details')")
+  string(FIND "${javascript}" "${marker}" found)
+  if(found EQUAL -1)
+    message(FATAL_ERROR "PROBANTE: apresentação segura do REDAPE ausente: ${marker}")
+  endif()
+endforeach()
+foreach(endpoint IN ITEMS "/api/health" "/api/readiness" "/api/capabilities" "/api/v1/auth/request-code" "/api/v1/auth/verify-code" "/api/v1/auth/me" "/api/v1/auth/logout" "/api/v1/auth/csrf" "/api/v1/connectors/redape/search" "/api/v1/connectors/redape/ingest" "/api/v1/analysis/graph")
   string(FIND "${javascript}" "${endpoint}" found)
   if(found EQUAL -1)
     message(FATAL_ERROR "PROBANTE: frontend não observa endpoint: ${endpoint}")

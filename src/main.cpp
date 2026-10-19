@@ -4,7 +4,10 @@
 #include <unistd.h>
 
 #include "nexo/auth.hpp"
+#include "nexo/graph.hpp"
 #include "nexo/redape.hpp"
+
+#include <nlohmann/json.hpp>
 
 #include <algorithm>
 #include <array>
@@ -23,7 +26,7 @@ namespace {
 constexpr std::string_view health =
     R"({"schema":"nexo.health/1.0.0","status":"ok","complete":false})";
 constexpr std::string_view capabilities =
-    R"({"schema":"nexo.capabilities/1.0.0","capabilities":[{"id":"external-reference.validate","version":"1.0.0"},{"id":"connector.redape.ingest","version":"1.0.0"}]})";
+    R"({"schema":"nexo.capabilities/1.0.0","capabilities":[{"id":"external-reference.validate","version":"1.0.0"},{"id":"connector.redape.search","version":"1.0.0"},{"id":"connector.redape.ingest","version":"1.0.0"},{"id":"analysis.emergent-graph","version":"1.0.0"}]})";
 
 struct Response {
     int status;
@@ -229,7 +232,9 @@ Response response_for(const std::string_view request) {
                     R"({"error":{"code":"auth_unavailable","message":"Autenticação indisponível"}})", {}};
         }
     }
-    if (request.starts_with("POST /api/v1/connectors/redape/ingest ")) {
+    if (request.starts_with("POST /api/v1/connectors/redape/search ") ||
+        request.starts_with("POST /api/v1/connectors/redape/ingest ")) {
+        const bool persist = request.starts_with("POST /api/v1/connectors/redape/ingest ");
         try {
             const auto user = nexo::auth::authenticate(database_url(), session_cookie(request));
             if (!user)
@@ -267,7 +272,15 @@ Response response_for(const std::string_view request) {
                     return {422, "Unprocessable Entity", "application/json",
                             R"({"error":{"code":"invalid_limit","message":"Limite deve estar entre 1 e 100"}})", {}};
             }
-            const auto receipt = nexo::redape::ingest(database_url(), criteria);
+            nexo::redape::IngestReceipt receipt;
+            if (persist) {
+                receipt = nexo::redape::ingest(database_url(), criteria);
+            } else {
+                auto discovery = nexo::redape::discover(criteria);
+                receipt.discovered = discovery.references.size();
+                receipt.total_available = discovery.total_available;
+                receipt.references = std::move(discovery.references);
+            }
             std::string items = "[";
             for (std::size_t index = 0; index < receipt.references.size(); ++index) {
                 const auto& reference = receipt.references[index];
@@ -279,7 +292,8 @@ Response response_for(const std::string_view request) {
             }
             items += ']';
             return {200, "OK", "application/json",
-                    "{\"provider_id\":\"redape\",\"discovered\":" +
+                    "{\"provider_id\":\"redape\",\"persisted\":" +
+                        std::string(persist ? "true" : "false") + ",\"discovered\":" +
                         std::to_string(receipt.discovered) + ",\"cataloged\":" +
                         std::to_string(receipt.cataloged) + ",\"total_available\":" +
                         std::to_string(receipt.total_available) + ",\"items\":" + items + "}", {}};
@@ -287,6 +301,63 @@ Response response_for(const std::string_view request) {
             std::cerr << "[NEXO REDAPE] " << error.what() << '\n';
             return {502, "Bad Gateway", "application/json",
                     R"({"error":{"code":"redape_unavailable","message":"Não foi possível consultar o REDAPE"}})", {}};
+        }
+    }
+    if (request.starts_with("POST /api/v1/analysis/graph ")) {
+        try {
+            const auto user = nexo::auth::authenticate(database_url(), session_cookie(request));
+            if (!user)
+                return {401, "Unauthorized", "application/json",
+                        R"({"error":{"code":"unauthenticated","message":"Autenticação necessária"}})", {}};
+            if (!nexo::auth::verify_csrf(*user, header_of(request, "X-CSRF-Token")))
+                return {403, "Forbidden", "application/json",
+                        R"({"error":{"code":"csrf_failed","message":"Token CSRF inválido"}})", {}};
+            const auto body = body_of(request);
+            std::vector<nexo::graph::Document> transient_docs;
+            std::string query_filter;
+            std::vector<std::string> reference_ids;
+
+            if (!body.empty()) {
+                try {
+                    const auto parsed = nlohmann::json::parse(body);
+                    if (parsed.is_object()) {
+                        if (parsed.contains("documents") && parsed["documents"].is_array()) {
+                            for (const auto& item : parsed["documents"]) {
+                                if (item.is_object()) {
+                                    transient_docs.push_back({
+                                        item.value("id", ""),
+                                        item.value("title", ""),
+                                        item.value("uri", "")
+                                    });
+                                }
+                            }
+                        }
+                        if (parsed.contains("query") && parsed["query"].is_string()) {
+                            query_filter = parsed["query"].get<std::string>();
+                        }
+                        if (parsed.contains("reference_ids") && parsed["reference_ids"].is_array()) {
+                            for (const auto& id_val : parsed["reference_ids"]) {
+                                if (id_val.is_string()) reference_ids.push_back(id_val.get<std::string>());
+                            }
+                        }
+                    }
+                } catch (...) {
+                    // Ignora parsing defeituoso e segue com escopo normal
+                }
+            }
+
+            if (!transient_docs.empty()) {
+                auto analysis = nexo::graph::learn(std::move(transient_docs));
+                analysis.scope_label = "pesquisa ativa (" + std::to_string(analysis.documents.size()) + " itens transitórios)";
+                return {200, "OK", "application/json", nexo::graph::to_json(analysis), {}};
+            }
+
+            auto analysis = nexo::graph::run(database_url(), query_filter, reference_ids);
+            return {200, "OK", "application/json", nexo::graph::to_json(analysis), {}};
+        } catch (const std::exception& error) {
+            std::cerr << "[NEXO GRAPH] " << error.what() << '\n';
+            return {503, "Service Unavailable", "application/json",
+                    R"({"error":{"code":"analysis_unavailable","message":"Análise de grafo indisponível"}})", {}};
         }
     }
 
@@ -297,6 +368,9 @@ Response response_for(const std::string_view request) {
         type = "text/html; charset=utf-8";
     } else if (request.starts_with("GET /styles.css ")) {
         asset = "styles.css";
+        type = "text/css; charset=utf-8";
+    } else if (request.starts_with("GET /redape-results.css ")) {
+        asset = "redape-results.css";
         type = "text/css; charset=utf-8";
     } else if (request.starts_with("GET /app.js ")) {
         asset = "app.js";
