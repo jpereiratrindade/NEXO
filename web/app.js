@@ -1,5 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 let csrf = sessionStorage.getItem('nexo_csrf') || '';
+let challenge = '';
+let pendingEmail = '';
 
 async function authApi(path, init = {}) {
   const headers = new Headers(init.headers);
@@ -16,6 +18,13 @@ function unlock() {
   hydrate();
 }
 
+function showEmailStep() {
+  challenge = '';
+  $('#code-form').reset();
+  $('#code-form').hidden = true;
+  $('#email-form').hidden = false;
+}
+
 async function authenticate() {
   try {
     await authApi('/api/v1/auth/me');
@@ -25,13 +34,34 @@ async function authenticate() {
   }
 }
 
-$('#login-form').addEventListener('submit', async (event) => {
+$('#email-form').addEventListener('submit', async (event) => {
   event.preventDefault();
-  const error = $('.login-error');
+  const error = event.currentTarget.querySelector('.login-error');
   error.textContent = '';
   try {
-    const result = await authApi('/api/v1/auth/login', {
+    const data = Object.fromEntries(new FormData(event.currentTarget));
+    pendingEmail = String(data.email).trim().toLowerCase();
+    const result = await authApi('/api/v1/auth/request-code', {
       method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget)))
+    });
+    challenge = result.challenge_id;
+    $('#code-destination').textContent = `Código enviado para ${pendingEmail}. Válido por 10 minutos.`;
+    $('#email-form').hidden = true;
+    $('#code-form').hidden = false;
+    $('#code-form input[name="code"]').focus();
+  } catch (failure) {
+    error.textContent = failure.message;
+  }
+});
+
+$('#code-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const error = event.currentTarget.querySelector('.login-error');
+  error.textContent = '';
+  try {
+    const code = new FormData(event.currentTarget).get('code');
+    const result = await authApi('/api/v1/auth/verify-code', {
+      method: 'POST', body: JSON.stringify({ challenge_id: challenge, code })
     });
     csrf = result.csrf_token;
     sessionStorage.setItem('nexo_csrf', csrf);
@@ -41,10 +71,16 @@ $('#login-form').addEventListener('submit', async (event) => {
   }
 });
 
+$('#change-email').addEventListener('click', () => {
+  showEmailStep();
+  $('#email-form input[name="email"]').focus();
+});
+
 $('#logout').addEventListener('click', async () => {
   try { await authApi('/api/v1/auth/logout', { method: 'POST', body: '{}' }); } catch (_) { /* sessão será descartada localmente */ }
   csrf = '';
   sessionStorage.removeItem('nexo_csrf');
+  showEmailStep();
   document.body.classList.add('auth-locked');
 });
 

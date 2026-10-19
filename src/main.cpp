@@ -91,6 +91,16 @@ std::string database_url() {
     return value == nullptr ? std::string{} : std::string(value);
 }
 
+std::string environment(const char* name) {
+    const char* value = std::getenv(name);
+    return value == nullptr ? std::string{} : std::string(value);
+}
+
+nexo::auth::MailConfig mail_config() {
+    return {environment("NEXO_SMTP_URL"), environment("NEXO_SMTP_FROM"),
+            environment("NEXO_SMTP_USERNAME"), environment("NEXO_SMTP_PASSWORD")};
+}
+
 std::string load_asset(const std::string_view filename) {
     const auto path = std::filesystem::path(NEXO_WEB_ROOT) / filename;
     std::ifstream stream(path, std::ios::binary);
@@ -108,7 +118,7 @@ Response response_for(const std::string_view request) {
     if (request.starts_with("GET /api/capabilities "))
         return {200, "OK", "application/json", std::string(capabilities), {}};
 
-    if (request.starts_with("POST /api/v1/auth/login ")) {
+    if (request.starts_with("POST /api/v1/auth/request-code ")) {
         try {
             const auto connection = database_url();
             if (connection.empty())
@@ -118,13 +128,32 @@ Response response_for(const std::string_view request) {
             std::transform(email.begin(), email.end(), email.begin(), [](const unsigned char character) {
                 return static_cast<char>(std::tolower(character));
             });
-            const auto password = json_field(body_of(request), "password");
-            const auto result = nexo::auth::login(connection, email, password);
-            if (!result) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(150));
+            if (!nexo::auth::is_embrapa_email(email))
+                return {422, "Unprocessable Entity", "application/json",
+                        R"({"error":{"code":"invalid_email","message":"Use um e-mail @embrapa.br válido"}})", {}};
+            const auto result = nexo::auth::request_code(connection, email,
+                                                          environment("NEXO_AUTH_PEPPER"),
+                                                          mail_config());
+            if (!result.sent)
+                return {429, "Too Many Requests", "application/json",
+                        R"({"error":{"code":"rate_limited","message":"Aguarde antes de solicitar outro código"}})",
+                        "Retry-After: 60\r\n"};
+            return {202, "Accepted", "application/json",
+                    "{\"challenge_id\":\"" + result.challenge_id +
+                        "\",\"expires_in\":600}", {}};
+        } catch (const std::exception&) {
+            return {503, "Service Unavailable", "application/json",
+                    R"({"error":{"code":"delivery_unavailable","message":"Não foi possível enviar o código"}})", {}};
+        }
+    }
+    if (request.starts_with("POST /api/v1/auth/verify-code ")) {
+        try {
+            const auto result = nexo::auth::verify_code(
+                database_url(), json_field(body_of(request), "challenge_id"),
+                json_field(body_of(request), "code"), environment("NEXO_AUTH_PEPPER"));
+            if (!result)
                 return {401, "Unauthorized", "application/json",
-                        R"({"error":{"code":"invalid_credentials","message":"Credenciais inválidas"}})", {}};
-            }
+                        R"({"error":{"code":"invalid_code","message":"Código inválido ou expirado"}})", {}};
             const auto body = "{\"user\":{\"id\":\"" + json_escape(result->user.id) +
                 "\",\"email\":\"" + json_escape(result->user.email) +
                 "\",\"display_name\":\"" + json_escape(result->user.display_name) +
@@ -218,9 +247,8 @@ int main(const int argc, char** argv) {
             else { std::cerr << "uso: nexo-server setup-admin --email usuario@embrapa.br [--display-name nome]\n"; return EXIT_FAILURE; }
         }
         if (email.empty()) { std::cerr << "--email é obrigatório\n"; return EXIT_FAILURE; }
-        const char* raw = ::getpass("Senha (mínimo 12 caracteres): ");
         try {
-            nexo::auth::setup_admin(connection, email, display_name, raw == nullptr ? "" : raw);
+            nexo::auth::setup_admin(connection, email, display_name);
             std::cout << "Administrador criado.\n";
             return EXIT_SUCCESS;
         } catch (const std::exception& error) {

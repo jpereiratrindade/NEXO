@@ -25,7 +25,9 @@ Este projeto é um MVP isolado. Não substitui `sister-nexo`.
 - servidor HTTP mínimo em `127.0.0.1`;
 - endpoints `/api/health`, `/api/readiness` e `/api/capabilities`;
 - interface web responsiva servida na raiz `/`;
-- autenticação por e-mail `@embrapa.br` com PBKDF2, sessão opaca, CSRF e cookie HttpOnly;
+- autenticação sem senha por código enviado ao e-mail `@embrapa.br`;
+- código de uso único com expiração, limite de tentativas e envio SMTP/TLS;
+- sessão opaca, CSRF e cookie HttpOnly;
 - testes do domínio e dos contratos.
 
 ## Build
@@ -51,12 +53,21 @@ Defina `NEXO_DATABASE_URL`, aplique as migrações e crie o primeiro administrad
 
 ```bash
 export NEXO_DATABASE_URL='postgresql://...'
+export NEXO_AUTH_PEPPER='segredo-aleatorio-com-no-minimo-32-caracteres'
+export NEXO_SMTP_URL='smtps://smtp.exemplo:465'
+export NEXO_SMTP_FROM='nexo@embrapa.br'
+export NEXO_SMTP_USERNAME='usuario-do-relay'
+export NEXO_SMTP_PASSWORD='senha-do-relay'
 psql "$NEXO_DATABASE_URL" -f storage/migrations/001_initial.sql
 psql "$NEXO_DATABASE_URL" -f storage/migrations/002_authentication.sql
+psql "$NEXO_DATABASE_URL" -f storage/migrations/003_embrapa_email_identity.sql
+psql "$NEXO_DATABASE_URL" -f storage/migrations/004_email_login_codes.sql
 ./build/nexo-server setup-admin --email nome@embrapa.br --display-name "Administrador"
 ```
 
-A senha é solicitada no terminal e nunca aceita por argumento.
+`NEXO_SMTP_PASSWORD` e `NEXO_AUTH_PEPPER` existem somente no ambiente operacional.
+Nunca são gravados pelo NEXO. O código recebido por e-mail também nunca é
+persistido em claro.
 
 Somente loopback é aceito. Persistência e conector GeoInfo entram nos próximos
 incrementos.

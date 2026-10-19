@@ -27,10 +27,17 @@
       <span class="login-kicker">Acesso ao sistema</span>
       <h2>Boas-vindas</h2>
       <p>Use sua identidade institucional para acessar o NEXO.</p>
-      <form id="login-form">
+      <form id="email-form">
         <label>E-mail Embrapa<input name="email" type="email" inputmode="email" autocomplete="username" placeholder="nome@embrapa.br" pattern=".+@embrapa\.br" required></label>
-        <label>Senha<input name="password" type="password" autocomplete="current-password" required></label>
-        <button type="submit">Entrar</button>
+        <button type="submit">Enviar código de acesso</button>
+        <p class="login-help">Enviaremos um código de uso único para confirmar sua identidade.</p>
+        <p class="login-error" role="alert"></p>
+      </form>
+      <form id="code-form" hidden>
+        <p class="code-destination" id="code-destination"></p>
+        <label>Código de acesso<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required></label>
+        <button type="submit">Confirmar e entrar</button>
+        <button class="secondary-button" id="change-email" type="button">Usar outro e-mail</button>
         <p class="login-error" role="alert"></p>
       </form>
       <small>Sempre pronto. Sempre incompleto.</small>

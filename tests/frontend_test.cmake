@@ -14,7 +14,8 @@ foreach(marker IN ITEMS
     "Ecossistema SisTer"
     "NEXO · científico"
     "E-mail Embrapa"
-    "id=\"login-form\""
+    "id=\"email-form\""
+    "id=\"code-form\""
     "id=\"health-value\""
     "id=\"capability-list\"")
   string(FIND "${html}" "${marker}" found)
@@ -24,7 +25,7 @@ foreach(marker IN ITEMS
 endforeach()
 
 file(READ "${script}" javascript)
-foreach(endpoint IN ITEMS "/api/health" "/api/readiness" "/api/capabilities" "/api/v1/auth/login" "/api/v1/auth/me" "/api/v1/auth/logout")
+foreach(endpoint IN ITEMS "/api/health" "/api/readiness" "/api/capabilities" "/api/v1/auth/request-code" "/api/v1/auth/verify-code" "/api/v1/auth/me" "/api/v1/auth/logout")
   string(FIND "${javascript}" "${endpoint}" found)
   if(found EQUAL -1)
     message(FATAL_ERROR "PROBANTE: frontend não observa endpoint: ${endpoint}")
