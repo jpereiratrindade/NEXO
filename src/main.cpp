@@ -39,12 +39,27 @@ std::string_view body_of(const std::string_view request) {
 }
 
 std::string header_of(const std::string_view request, const std::string_view name) {
-    const auto marker = "\r\n" + std::string(name) + ": ";
-    const auto start = request.find(marker);
-    if (start == std::string_view::npos) return {};
-    const auto value_start = start + marker.size();
-    const auto end = request.find("\r\n", value_start);
-    return std::string(request.substr(value_start, end - value_start));
+    auto line_start = request.find("\r\n");
+    while (line_start != std::string_view::npos) {
+        line_start += 2;
+        const auto line_end = request.find("\r\n", line_start);
+        if (line_end == std::string_view::npos || line_end == line_start) break;
+        const auto line = request.substr(line_start, line_end - line_start);
+        const auto colon = line.find(':');
+        const bool same_name = colon == name.size() &&
+            std::equal(name.begin(), name.end(), line.begin(), [](const char expected, const char actual) {
+                return std::tolower(static_cast<unsigned char>(expected)) ==
+                       std::tolower(static_cast<unsigned char>(actual));
+            });
+        if (same_name) {
+            auto value_start = colon + 1;
+            while (value_start < line.size() &&
+                   std::isspace(static_cast<unsigned char>(line[value_start])) != 0) ++value_start;
+            return std::string(line.substr(value_start));
+        }
+        line_start = line_end;
+    }
+    return {};
 }
 
 std::string json_field(const std::string_view json, const std::string_view field) {
