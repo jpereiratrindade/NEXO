@@ -27,17 +27,18 @@
       <span class="login-kicker">Acesso ao sistema</span>
       <h2>Boas-vindas</h2>
       <p>Use sua identidade institucional para acessar o NEXO.</p>
-      <form id="email-form">
+      <form id="email-form" novalidate>
         <label>E-mail Embrapa<input name="email" type="email" inputmode="email" autocomplete="username" placeholder="nome@embrapa.br" pattern=".+@embrapa\.br" required></label>
         <button type="submit">Gerar código de acesso</button>
-        <p class="login-help">Ambiente local: o código será exibido na próxima etapa. Nenhum e-mail será enviado.</p>
+        <p class="login-help"><strong>Modo local (piloto):</strong> o código será exibido na próxima etapa e no console do servidor.</p>
         <p class="login-error" role="alert"></p>
       </form>
       <form id="code-form" hidden>
         <p class="code-destination" id="code-destination"></p>
-        <div class="development-code" id="development-code" aria-live="polite"></div>
+        <div class="development-code" id="development-code" aria-live="polite"><small>MODO LOCAL (PILOTO)</small><strong></strong></div>
         <label>Código de acesso<input name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="000000" required></label>
         <button type="submit">Confirmar e entrar</button>
+        <button class="secondary-button" id="resend-code" type="button">Gerar nova chave</button>
         <button class="secondary-button" id="change-email" type="button">Usar outro e-mail</button>
         <p class="login-error" role="alert"></p>
       </form>

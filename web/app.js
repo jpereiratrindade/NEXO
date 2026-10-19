@@ -20,7 +20,7 @@ function unlock() {
 
 function showEmailStep() {
   challenge = '';
-  $('#development-code').textContent = '';
+  $('#development-code strong').textContent = '';
   $('#code-form').reset();
   $('#code-form').hidden = true;
   $('#email-form').hidden = false;
@@ -42,18 +42,27 @@ $('#email-form').addEventListener('submit', async (event) => {
   try {
     const data = Object.fromEntries(new FormData(event.currentTarget));
     pendingEmail = String(data.email).trim().toLowerCase();
+    if (!/^[^@\s]+@embrapa\.br$/.test(pendingEmail)) {
+      throw new Error('Use um e-mail institucional válido @embrapa.br.');
+    }
     const result = await authApi('/api/v1/auth/request-code', {
       method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget)))
     });
     challenge = result.challenge_id;
-    $('#code-destination').textContent = `Identidade local associada a ${pendingEmail}. Código válido por 10 minutos.`;
-    $('#development-code').textContent = result.development_code;
+    $('#code-destination').textContent = `Identidade local associada a ${pendingEmail}. Código válido por 15 minutos.`;
+    $('#development-code strong').textContent = result.dev_code;
     $('#email-form').hidden = true;
     $('#code-form').hidden = false;
     $('#code-form input[name="code"]').focus();
   } catch (failure) {
     error.textContent = failure.message;
   }
+});
+
+$('#resend-code').addEventListener('click', () => {
+  $('#code-form').hidden = true;
+  $('#email-form').hidden = false;
+  $('#email-form').requestSubmit();
 });
 
 $('#code-form').addEventListener('submit', async (event) => {

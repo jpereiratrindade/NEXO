@@ -55,7 +55,6 @@ Defina `NEXO_DATABASE_URL`, aplique as migrações e crie o primeiro administrad
 ```bash
 export NEXO_DATABASE_URL='postgresql://...'
 export NEXO_AUTH_PEPPER='segredo-aleatorio-com-no-minimo-32-caracteres'
-export NEXO_AUTH_MODE='development'
 psql "$NEXO_DATABASE_URL" -f storage/migrations/001_initial.sql
 psql "$NEXO_DATABASE_URL" -f storage/migrations/002_authentication.sql
 psql "$NEXO_DATABASE_URL" -f storage/migrations/003_embrapa_email_identity.sql
@@ -66,10 +65,10 @@ psql "$NEXO_DATABASE_URL" -f storage/migrations/004_email_login_codes.sql
 `NEXO_AUTH_PEPPER` existe somente no ambiente operacional e nunca é gravado pelo
 NEXO. O código também não é persistido em claro.
 
-O modo `development` replica a estratégia local do ContextLab: o código retorna
-à própria interface. Isso associa a sessão ao e-mail informado, mas **não comprova
-posse da caixa postal**. Em produção, o NEXO falha fechado até existir provedor
-institucional de identidade ou entrega.
+Na ausência de provedor de entrega, o NEXO replica o modo piloto do RIZOMA: o
+código aparece no console do servidor e na interface. Isso associa a sessão ao
+e-mail informado, mas **não comprova posse da caixa postal**. O modo deve ser
+substituído por entrega ou identidade institucional antes de produção.
 
 Somente loopback é aceito. Persistência e conector GeoInfo entram nos próximos
 incrementos.

@@ -126,18 +126,21 @@ Response response_for(const std::string_view request) {
             if (!nexo::auth::is_embrapa_email(email))
                 return {422, "Unprocessable Entity", "application/json",
                         R"({"error":{"code":"invalid_email","message":"Use um e-mail @embrapa.br válido"}})", {}};
-            if (environment("NEXO_AUTH_MODE") != "development")
-                return {503, "Service Unavailable", "application/json",
-                        R"({"error":{"code":"identity_provider_unavailable","message":"Provedor institucional de identidade não configurado"}})", {}};
             const auto result = nexo::auth::request_code(connection, email,
                                                           environment("NEXO_AUTH_PEPPER"));
             if (result.challenge_id.empty())
                 return {429, "Too Many Requests", "application/json",
                         R"({"error":{"code":"rate_limited","message":"Aguarde antes de solicitar outro código"}})",
                         "Retry-After: 60\r\n"};
+            std::cout << "\n[NEXO AUTH] ========================================\n"
+                      << "[NEXO AUTH] Modo local (piloto)\n"
+                      << "[NEXO AUTH] Identidade : " << email << '\n'
+                      << "[NEXO AUTH] Código OTP : " << result.development_code
+                      << " (válido por 15 min)\n"
+                      << "[NEXO AUTH] ========================================\n\n" << std::flush;
             return {202, "Accepted", "application/json",
                     "{\"challenge_id\":\"" + result.challenge_id +
-                        "\",\"expires_in\":600,\"development_code\":\"" +
+                        "\",\"expires_in\":900,\"dev_code\":\"" +
                         result.development_code + "\",\"delivery\":\"local_development\"}", {}};
         } catch (const std::exception&) {
             return {503, "Service Unavailable", "application/json",
@@ -279,6 +282,12 @@ int main(const int argc, char** argv) {
         return EXIT_FAILURE;
     }
     std::cout << "NEXO listening on 127.0.0.1:" << port << '\n';
+    if (database_url().empty())
+        std::cerr << "[NEXO AUTH] INATIVA: defina NEXO_DATABASE_URL e aplique as migrações.\n";
+    if (environment("NEXO_AUTH_PEPPER").size() < 32)
+        std::cerr << "[NEXO AUTH] INATIVA: NEXO_AUTH_PEPPER deve ter ao menos 32 caracteres.\n";
+    if (!database_url().empty() && environment("NEXO_AUTH_PEPPER").size() >= 32)
+        std::cout << "[NEXO AUTH] Modo local (piloto): chave exibida no console e na interface.\n";
 
     while (true) {
         const int client = ::accept(server, nullptr, nullptr);

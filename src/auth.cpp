@@ -107,7 +107,7 @@ CodeRequest request_code(const std::string_view connection, const std::string_vi
         return {{}, {}};
     const auto challenge = random_hex(16);
     const auto code = one_time_code();
-    query(db.get(), "INSERT INTO nexo_login_codes(challenge_id,email,code_hash,expires_at) VALUES($1,$2,$3,now()+interval '10 minutes')",
+    query(db.get(), "INSERT INTO nexo_login_codes(challenge_id,email,code_hash,expires_at) VALUES($1,$2,$3,now()+interval '15 minutes')",
           {challenge, std::string(email), code_digest(challenge, code, pepper)});
     return {challenge, code};
 }
