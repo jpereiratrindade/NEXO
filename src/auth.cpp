@@ -88,6 +88,17 @@ bool is_embrapa_email(const std::string_view email) {
     return email.find('@') == email.size() - domain.size();
 }
 
+bool database_ready(const std::string_view connection) noexcept {
+    if (connection.empty()) return false;
+    try {
+        auto db = connect(connection);
+        auto result = query(db.get(), "SELECT to_regclass('public.nexo_login_codes') IS NOT NULL");
+        return PQntuples(result.get()) == 1 && std::string_view(PQgetvalue(result.get(), 0, 0)) == "t";
+    } catch (...) {
+        return false;
+    }
+}
+
 void setup_admin(const std::string_view connection, const std::string_view email,
                  const std::string_view display_name) {
     if (!is_embrapa_email(email)) throw std::invalid_argument("e-mail deve pertencer ao domínio @embrapa.br");

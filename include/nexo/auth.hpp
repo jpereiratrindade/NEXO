@@ -31,6 +31,7 @@ struct CodeRequest {
 [[nodiscard]] std::string code_digest(std::string_view challenge_id, std::string_view code,
                                       std::string_view pepper);
 [[nodiscard]] bool is_embrapa_email(std::string_view email);
+[[nodiscard]] bool database_ready(std::string_view connection) noexcept;
 
 void setup_admin(std::string_view connection, std::string_view email,
                  std::string_view display_name);

@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: docker.io/library/postgres:18-alpine
+    container_name: nexo-postgres
+    environment:
+      POSTGRES_DB: nexo
+      POSTGRES_USER: nexo
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - nexo-postgres18-data:/var/lib/postgresql
+      - ./storage/migrations:/docker-entrypoint-initdb.d:ro,Z
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nexo -d nexo"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  nexo-postgres18-data:

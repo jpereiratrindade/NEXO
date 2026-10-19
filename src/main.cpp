@@ -282,11 +282,13 @@ int main(const int argc, char** argv) {
         return EXIT_FAILURE;
     }
     std::cout << "NEXO listening on 127.0.0.1:" << port << '\n';
-    if (database_url().empty())
-        std::cerr << "[NEXO AUTH] INATIVA: defina NEXO_DATABASE_URL e aplique as migrações.\n";
-    if (environment("NEXO_AUTH_PEPPER").size() < 32)
+    const bool database_is_ready = nexo::auth::database_ready(database_url());
+    const bool pepper_is_ready = environment("NEXO_AUTH_PEPPER").size() >= 32;
+    if (!database_is_ready)
+        std::cerr << "[NEXO AUTH] INATIVA: PostgreSQL indisponível ou migrações ausentes.\n";
+    if (!pepper_is_ready)
         std::cerr << "[NEXO AUTH] INATIVA: NEXO_AUTH_PEPPER deve ter ao menos 32 caracteres.\n";
-    if (!database_url().empty() && environment("NEXO_AUTH_PEPPER").size() >= 32)
+    if (database_is_ready && pepper_is_ready)
         std::cout << "[NEXO AUTH] Modo local (piloto): chave exibida no console e na interface.\n";
 
     while (true) {

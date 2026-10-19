@@ -44,6 +44,19 @@ invariante observável do domínio, dos contratos ou da experiência web.
 
 ## Executar
 
+No Fedora com Podman, o lançador prepara PostgreSQL, aplica migrações no primeiro
+volume, compila e inicia o NEXO:
+
+```bash
+./scripts/run-local.sh
+```
+
+Por padrão, abre `http://127.0.0.1:18116/`. O PostgreSQL do piloto escuta somente
+em `127.0.0.1:55432` e usa autenticação `trust`; nunca exponha essa composição em
+rede ou produção.
+
+Para uma instalação PostgreSQL já administrada:
+
 ```bash
 ./build/nexo-server --port 18115
 ```
