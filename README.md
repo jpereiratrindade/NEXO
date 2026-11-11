@@ -85,3 +85,9 @@ substituído por entrega ou identidade institucional antes de produção.
 
 Somente loopback é aceito. Persistência e conector GeoInfo entram nos próximos
 incrementos.
+
+## Premissas de desenvolvimento
+
+**Simples, leve. Sempre pronto. Sempre incompleto!**
+
+[Significado e símbolos das premissas](docs/sister-principles/README.md).
